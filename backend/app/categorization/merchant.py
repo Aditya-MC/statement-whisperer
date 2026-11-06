@@ -55,13 +55,20 @@ BUSINESS_WORDS = _words(
     AIRWAYS MOTORS AUTO FUEL STATION PETROL ENTERPRISES TRADERS AGENCY AGENCIES SCHOOL COLLEGE
     UNIVERSITY ACADEMY CENTRE CENTER GROUP INDUSTRIES INTERNATIONAL GLOBAL ONLINE RETAIL
     SUPERMARKET HYPERMARKET POSTPAID PREPAID BROADBAND CINEMAS MOVIES GYM FITNESS SAVINGS
-    MEGASTORE TRIP POINT"""
+    MEGASTORE TRIP POINT TRANSPORT TRANSPORTS COLLECTION COLLECTIONS COMPUTER COMPUTERS PUMP
+    DIGITAL INDIA ELECTRONICS MOBILES MEDICALS SWEETS BAKERY TRADING TEXTILES HARDWARE
+    STALL MILK DAIRY BAZAAR"""
 )
 
 _SEGMENT_SPLIT = re.compile(r"[/:|*]+|\s-\s|-(?=\S)|(?<=\S)-")
 _MASKED_CARD = re.compile(r"^[X*]{2,}\d+$")
-_NAME_TOKEN = re.compile(r"^[A-Z][A-Z.']{0,14}$")
+_NAME_TOKEN = re.compile(r"^[A-Z][A-Z.']{0,19}$")
 _MAX_LEN = 60
+#: Names at least this long may have been cut off by the bank (IOB uses 14 characters).
+_TRUNCATION_HINT = 12
+#: Honorifics that mark a person. SRI/SHRI are left out: "SRI SAI STORES" is a common shop name.
+_TITLES = frozenset({"MR", "MRS", "MS", "MISS", "SMT", "KUM"})
+_TLDS = frozenset({"COM", "IN", "NET", "ORG", "CO", "IO", "APP", "AI"})
 
 
 @dataclass(frozen=True)
@@ -74,16 +81,18 @@ class CleanMerchant:
 
 
 def _domain_label(token: str) -> str:
-    """HELP.UBER.COM -> UBER, NETFLIX.COM -> NETFLIX, INT.PD -> INT."""
+    """HELP.UBER.COM -> UBER, NETFLIX.COM -> NETFLIX. Non-domains (N.RANI) are left alone."""
     labels = [p for p in token.split(".") if p]
-    if len(labels) >= 2:
-        return labels[-2] if len(labels[-1]) <= 3 else labels[0]
-    return labels[0] if labels else ""
+    if len(labels) >= 2 and labels[-1] in _TLDS:
+        return labels[-2]
+    return token
 
 
 def _is_noise(token: str) -> bool:
     if not token or token in CHANNEL_WORDS:
         return True
+    if "." in token and all(p in CHANNEL_WORDS for p in token.split(".") if p):
+        return True  # INT.PD, NEFT.CR
     if "@" in token or _MASKED_CARD.match(token):
         return True
     digits = sum(ch.isdigit() for ch in token)
@@ -105,12 +114,60 @@ def _clean_segment(segment: str) -> list[str]:
     return out
 
 
-def _looks_like_person(tokens: list[str]) -> bool:
-    if not 2 <= len(tokens) <= 4:
+def _is_business_word(token: str, *, allow_prefix: bool) -> bool:
+    """Exact business word, or (for a name the bank cut short) a prefix of one:
+    SERVIC -> SERVICES, TRANSPO -> TRANSPORT, STO -> STORE."""
+    if token in BUSINESS_WORDS or token in KEYWORDS:
+        return True
+    return allow_prefix and len(token) >= 3 and any(w.startswith(token) for w in BUSINESS_WORDS)
+
+
+def _looks_like_person(tokens: list[str], *, min_tokens: int = 2) -> bool:
+    if not min_tokens <= len(tokens) <= 4:
         return False
-    if any(t in BUSINESS_WORDS or t in KEYWORDS for t in tokens):
-        return False
+    # Banks truncate payee names (IOB: 14 chars), so the last word may be a cut-off "SERVIC".
+    truncated = len(" ".join(tokens)) >= _TRUNCATION_HINT
+    for i, t in enumerate(tokens):
+        if _is_business_word(t, allow_prefix=truncated and i == len(tokens) - 1):
+            return False
     return all(_NAME_TOKEN.match(t) for t in tokens)
+
+
+def _upi_counterparty(text: str) -> CleanMerchant | None:
+    """Positional parse for UPI/<ref>/<DR|CR>/<payee>/<bank>/<note> narrations.
+
+    The payee field is a person's or shop's display name, or a raw UPI handle such as
+    9876543210@pty. Splitting on "/" only matters because handles contain "-" and ".".
+    """
+    if not text.startswith("UPI/"):
+        return None
+    parts = [p.strip() for p in text.split("/")]
+    marker = next((i for i, p in enumerate(parts[:4]) if p in ("DR", "CR")), None)
+    if marker is None or marker + 1 >= len(parts) or not parts[marker + 1]:
+        return None
+    payee = " ".join(parts[marker + 1].split())
+    if "@" in payee or payee.replace(" ", "").isdigit():
+        # A UPI handle or phone number: always an individual's account in practice.
+        return CleanMerchant(payee[:_MAX_LEN], "UPI", frozenset(), is_person=True)
+    has_title = payee.split(" ", 1)[0] in _TITLES
+    tokens = _clean_segment(payee)
+    if not tokens:
+        return None
+    merchant = " ".join(tokens)[:_MAX_LEN]
+    # In this format a lone word with no business signal is almost always a person's name,
+    # so it is treated as one (never sent to the LLM). Brand rules still match first.
+    is_person = has_title or _looks_like_person(tokens, min_tokens=1)
+    return CleanMerchant(merchant, "UPI", frozenset(), is_person=is_person)
+
+
+def _segments(text: str) -> list[str]:
+    segs = [s.strip() for s in _SEGMENT_SPLIT.split(text)]
+    # NEFT-IDIB-IDIBH12345678-PAYER NAME: drop the 4-letter bank code that prefixes the UTR.
+    return [
+        s
+        for i, s in enumerate(segs)
+        if not (len(s) == 4 and s.isalpha() and i + 1 < len(segs) and segs[i + 1].startswith(s))
+    ]
 
 
 def clean_merchant(narration: str) -> CleanMerchant:
@@ -119,12 +176,15 @@ def clean_merchant(narration: str) -> CleanMerchant:
     keywords = frozenset(t for t in all_tokens if t in KEYWORDS)
     channel = next((t for t in all_tokens if t in CHANNEL_WORDS and t not in _GENERIC), None)
 
-    atm_words = {"WDL", "WITHDRAWAL", "CASH"} & set(all_tokens)
-    if "ATM" in all_tokens and (atm_words or text.startswith("ATM")):
+    if "ATM" in all_tokens:  # "ATM WDL ...", "123456-ATM-BRANCH NAME", "ATM CASH ..."
         return CleanMerchant("ATM WITHDRAWAL", "ATM", keywords, is_atm=True)
 
+    upi = _upi_counterparty(text)
+    if upi is not None:
+        return CleanMerchant(upi.merchant, upi.channel, keywords, is_person=upi.is_person)
+
     merchant_tokens: list[str] = []
-    for segment in _SEGMENT_SPLIT.split(text):
+    for segment in _segments(text):
         tokens = _clean_segment(segment)
         if tokens and sum(len(t) for t in tokens) >= 2:
             merchant_tokens = tokens
