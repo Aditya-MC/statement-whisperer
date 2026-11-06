@@ -1,0 +1,317 @@
+{
+ "layout": "drcr_suffix_amounts",
+ "file": "drcr_suffix_amounts.csv",
+ "header": [
+  "Txn Date",
+  "Particulars",
+  "Amount",
+  "Balance"
+ ],
+ "mapping": {
+  "date_column": 0,
+  "description_columns": [
+   1
+  ],
+  "amount_mode": "signed",
+  "amount_column": 2,
+  "debit_column": null,
+  "credit_column": null,
+  "type_column": null,
+  "balance_column": 3,
+  "date_format": "%d-%m-%Y",
+  "decimal_separator": ".",
+  "thousands_separator": ",",
+  "currency": "INR",
+  "sign_convention": "negative_is_debit",
+  "drcr_markers": true
+ },
+ "expected": {
+  "count": 47,
+  "opening_balance": "101644.00",
+  "closing_balance": "228418.08",
+  "transactions": [
+   {
+    "date": "2024-01-04",
+    "amount": "-4045.14",
+    "balance": "97598.86",
+    "narration": "CHQ PAID 5051686260 JOHN Q PUBLIC"
+   },
+   {
+    "date": "2024-01-05",
+    "amount": "-1545.35",
+    "balance": "96053.51",
+    "narration": "NEFT DR-2070867289-CITY POWER UTILITY"
+   },
+   {
+    "date": "2024-01-06",
+    "amount": "-2014.16",
+    "balance": "94039.35",
+    "narration": "ATM WDL 1308944456 MG ROAD BRANCH"
+   },
+   {
+    "date": "2024-01-06",
+    "amount": "-15000.00",
+    "balance": "79039.35",
+    "narration": "IMPS-4322559659-JANE DOE-RENT"
+   },
+   {
+    "date": "2024-01-07",
+    "amount": "-15000.00",
+    "balance": "64039.35",
+    "narration": "IMPS-1879521323-JANE DOE-RENT"
+   },
+   {
+    "date": "2024-01-07",
+    "amount": "-3718.08",
+    "balance": "60321.27",
+    "narration": "CHQ PAID 2782010769 JOHN Q PUBLIC"
+   },
+   {
+    "date": "2024-01-08",
+    "amount": "-433.45",
+    "balance": "59887.82",
+    "narration": "UPI/8334413227/SWIGGY/store77@okexample/Payment"
+   },
+   {
+    "date": "2024-01-09",
+    "amount": "-5000.00",
+    "balance": "54887.82",
+    "narration": "SIP 6088562310 EXAMPLE MUTUAL FUND"
+   },
+   {
+    "date": "2024-01-09",
+    "amount": "-578.70",
+    "balance": "54309.12",
+    "narration": "CARD XXXX7623 UBER TRIP HELP.UBER.COM"
+   },
+   {
+    "date": "2024-01-10",
+    "amount": "85000.00",
+    "balance": "139309.12",
+    "narration": "NEFT CR-5333958677-ACME CORP-SALARY"
+   },
+   {
+    "date": "2024-01-12",
+    "amount": "-15000.00",
+    "balance": "124309.12",
+    "narration": "IMPS-7280124215-JANE DOE-RENT"
+   },
+   {
+    "date": "2024-01-12",
+    "amount": "-250.00",
+    "balance": "124059.12",
+    "narration": "UPI/7777777777/CHAI POINT/jdoe@ybl"
+   },
+   {
+    "date": "2024-01-12",
+    "amount": "-250.00",
+    "balance": "123809.12",
+    "narration": "UPI/7777777777/CHAI POINT/jdoe@ybl"
+   },
+   {
+    "date": "2024-01-13",
+    "amount": "-2895.26",
+    "balance": "120913.86",
+    "narration": "POS XXXX8093 SHELL FUEL STATION 22"
+   },
+   {
+    "date": "2024-01-15",
+    "amount": "-5465.89",
+    "balance": "115447.97",
+    "narration": "CHQ PAID 4943154445 JOHN Q PUBLIC"
+   },
+   {
+    "date": "2024-01-15",
+    "amount": "-551.10",
+    "balance": "114896.87",
+    "narration": "BIL/ONL/8241168120/ACME TELECOM POSTPAID"
+   },
+   {
+    "date": "2024-01-18",
+    "amount": "-481.06",
+    "balance": "114415.81",
+    "narration": "BIL/ONL/9575876366/ACME TELECOM POSTPAID"
+   },
+   {
+    "date": "2024-01-20",
+    "amount": "85000.00",
+    "balance": "199415.81",
+    "narration": "NEFT CR-1136693708-ACME CORP-SALARY"
+   },
+   {
+    "date": "2024-01-23",
+    "amount": "262.42",
+    "balance": "199678.23",
+    "narration": "INT.PD:1625471900:SAVINGS INTEREST"
+   },
+   {
+    "date": "2024-01-23",
+    "amount": "-594.55",
+    "balance": "199083.68",
+    "narration": "ACH DEBIT NETFLIX.COM 8679442530"
+   },
+   {
+    "date": "2024-01-23",
+    "amount": "-893.58",
+    "balance": "198190.10",
+    "narration": "UPI/8923071770/ZEPTO MARKETPLACE/jdoe@ybl"
+   },
+   {
+    "date": "2024-01-25",
+    "amount": "1392.35",
+    "balance": "199582.45",
+    "narration": "UPI/9418700028/REFUND MEGASTORE/store77@okexample"
+   },
+   {
+    "date": "2024-01-26",
+    "amount": "85000.00",
+    "balance": "284582.45",
+    "narration": "NEFT CR-4873461239-ACME CORP-SALARY"
+   },
+   {
+    "date": "2024-01-29",
+    "amount": "1415.62",
+    "balance": "285998.07",
+    "narration": "IMPS-9022135356-JOHN Q PUBLIC-SPLIT"
+   },
+   {
+    "date": "2024-01-31",
+    "amount": "-7305.33",
+    "balance": "278692.74",
+    "narration": "CHQ PAID 6607934866 JOHN Q PUBLIC"
+   },
+   {
+    "date": "2024-02-03",
+    "amount": "-655.99",
+    "balance": "278036.75",
+    "narration": "BIL/ONL/4658547626/ACME TELECOM POSTPAID"
+   },
+   {
+    "date": "2024-02-04",
+    "amount": "-515.86",
+    "balance": "277520.89",
+    "narration": "CARD XXXX9197 UBER TRIP HELP.UBER.COM"
+   },
+   {
+    "date": "2024-02-05",
+    "amount": "-610.22",
+    "balance": "276910.67",
+    "narration": "CARD XXXX7692 UBER TRIP HELP.UBER.COM"
+   },
+   {
+    "date": "2024-02-06",
+    "amount": "-5000.00",
+    "balance": "271910.67",
+    "narration": "SIP 3225391935 EXAMPLE MUTUAL FUND"
+   },
+   {
+    "date": "2024-02-07",
+    "amount": "2415.78",
+    "balance": "274326.45",
+    "narration": "IMPS-9928535757-JOHN Q PUBLIC-SPLIT"
+   },
+   {
+    "date": "2024-02-10",
+    "amount": "501.75",
+    "balance": "274828.20",
+    "narration": "INT.PD:5277859672:SAVINGS INTEREST"
+   },
+   {
+    "date": "2024-02-12",
+    "amount": "-3357.28",
+    "balance": "271470.92",
+    "narration": "ATM WDL 3946163882 MG ROAD BRANCH"
+   },
+   {
+    "date": "2024-02-12",
+    "amount": "-639.24",
+    "balance": "270831.68",
+    "narration": "ACH DEBIT NETFLIX.COM 5770973525"
+   },
+   {
+    "date": "2024-02-12",
+    "amount": "123.78",
+    "balance": "270955.46",
+    "narration": "INT.PD:7293545132:SAVINGS INTEREST"
+   },
+   {
+    "date": "2024-02-14",
+    "amount": "-15000.00",
+    "balance": "255955.46",
+    "narration": "IMPS-9174105852-JANE DOE-RENT"
+   },
+   {
+    "date": "2024-02-15",
+    "amount": "358.04",
+    "balance": "256313.50",
+    "narration": "INT.PD:4721165022:SAVINGS INTEREST"
+   },
+   {
+    "date": "2024-02-15",
+    "amount": "-818.53",
+    "balance": "255494.97",
+    "narration": "BIL/ONL/7789897648/ACME TELECOM POSTPAID"
+   },
+   {
+    "date": "2024-02-17",
+    "amount": "-5619.48",
+    "balance": "249875.49",
+    "narration": "CHQ PAID 3007778143 JOHN Q PUBLIC"
+   },
+   {
+    "date": "2024-02-18",
+    "amount": "-15000.00",
+    "balance": "234875.49",
+    "narration": "IMPS-5157515118-JANE DOE-RENT"
+   },
+   {
+    "date": "2024-02-19",
+    "amount": "-3039.72",
+    "balance": "231835.77",
+    "narration": "POS XXXX6332 SHELL FUEL STATION 22"
+   },
+   {
+    "date": "2024-02-20",
+    "amount": "438.61",
+    "balance": "232274.38",
+    "narration": "INT.PD:5194810498:SAVINGS INTEREST"
+   },
+   {
+    "date": "2024-02-21",
+    "amount": "-2161.53",
+    "balance": "230112.85",
+    "narration": "ATM WDL 9508246721 MG ROAD BRANCH"
+   },
+   {
+    "date": "2024-02-22",
+    "amount": "-853.15",
+    "balance": "229259.70",
+    "narration": "BIL/ONL/2230071556/ACME TELECOM POSTPAID"
+   },
+   {
+    "date": "2024-02-22",
+    "amount": "-679.71",
+    "balance": "228579.99",
+    "narration": "BIL/ONL/2685297301/ACME TELECOM POSTPAID"
+   },
+   {
+    "date": "2024-02-22",
+    "amount": "933.34",
+    "balance": "229513.33",
+    "narration": "IMPS-4358266022-JOHN Q PUBLIC-SPLIT"
+   },
+   {
+    "date": "2024-02-25",
+    "amount": "-520.82",
+    "balance": "228992.51",
+    "narration": "BIL/ONL/6554201278/ACME TELECOM POSTPAID"
+   },
+   {
+    "date": "2024-02-25",
+    "amount": "-574.43",
+    "balance": "228418.08",
+    "narration": "ACH DEBIT NETFLIX.COM 6586419990"
+   }
+  ]
+ }
+}
