@@ -67,6 +67,9 @@ export function createApi(fetchImpl = (...a) => fetch(...a)) {
     listAccounts: () => call("/accounts"),
     createAccount: (body) => call("/accounts", { method: "POST", json: body }),
     listCategories: () => call("/categories"),
+    createCategory: (body) => call("/categories", { method: "POST", json: body }),
+    renameCategory: (id, name) => call(`/categories/${id}`, { method: "PATCH", json: { name } }),
+    deleteCategory: (id) => call(`/categories/${id}`, { method: "DELETE" }),
     listImports: (accountId) => call("/imports", { params: { account_id: accountId } }),
     getImport: (id) => call(`/imports/${id}`),
     uploadStatement: ({ accountId, file, mapping }) =>

@@ -4,6 +4,7 @@ import { api } from "../lib/api.js";
 import { SOURCE_LABELS, groupCategories } from "../lib/categories.js";
 import { amountTone, formatDate, formatMoney } from "../lib/format.js";
 import CategorySelect from "./CategorySelect.jsx";
+import NewCategoryDialog from "./NewCategoryDialog.jsx";
 import { Badge } from "./ui.jsx";
 
 const PAGE_SIZE = 50;
@@ -24,7 +25,9 @@ function useDebounced(value, ms = 300) {
  * `preset` comes from a dashboard drill-down ({category_id, date_from, date_to, q, uncategorized,
  * account_id}). The parent remounts this page (via `key`) for each new drill-down.
  */
-export default function TransactionsPage({ accounts, categories, initialAccountId, preset, notify }) {
+export default function TransactionsPage({ accounts, categories, initialAccountId, preset, notify, onCategoriesChanged }) {
+  // Row whose "+ New category…" was picked; the new category is applied to it once created.
+  const [newCategoryFor, setNewCategoryFor] = useState(null);
   const groups = useMemo(() => groupCategories(categories), [categories]);
   const accountsById = useMemo(() => new Map(accounts.map((a) => [a.id, a])), [accounts]);
   const [filters, setFilters] = useState(() => ({
@@ -175,6 +178,7 @@ export default function TransactionsPage({ accounts, categories, initialAccountI
                   value={t.category_id}
                   disabled={savingId === t.id}
                   onChange={(id) => changeCategory(t, id)}
+                  onRequestNew={() => setNewCategoryFor(t)}
                   className="!py-1"
                 />
                 <div className="flex flex-wrap items-center gap-1">
@@ -336,6 +340,20 @@ export default function TransactionsPage({ accounts, categories, initialAccountI
           </button>
         </div>
       </div>
+
+      {newCategoryFor && (
+        <NewCategoryDialog
+          groups={groups}
+          defaultGroupId={categories.find((c) => c.id === newCategoryFor.category_id)?.parent_id}
+          onClose={() => setNewCategoryFor(null)}
+          onCreated={async (cat) => {
+            const txn = newCategoryFor;
+            setNewCategoryFor(null);
+            await onCategoriesChanged?.();
+            changeCategory(txn, cat.id);
+          }}
+        />
+      )}
     </div>
   );
 }
