@@ -72,6 +72,52 @@ Unsupported types (PDF, images, legacy `.xls`) are rejected with HTTP 415 before
 
 The occurrence index lets two genuinely identical rows in one statement coexist, such as two identical coffees on the same day with no balance column. Because the index is computed per statement, the same pair appearing again in an overlapping statement produces the same two hashes and is skipped. Narrations are normalized (case, punctuation, whitespace), so cosmetic differences between exports still match.
 
+## Categorization (Phase 2)
+
+Runs automatically after every completed import, inside a savepoint: a categorization failure never undoes a validated import, and `POST /api/categorize` can retry later. Rows you categorized by hand (`category_source = user`) and linked transfers are never touched.
+
+```mermaid
+flowchart TD
+    N[raw_narration] --> M[merchant.py<br/>clean_merchant]
+    M --> U{user rule?}
+    U -->|yes| A[assign · source=rule]
+    U -->|no| H{built-in hint?<br/>ATM, SALARY, REFUND, EMI, person…}
+    H -->|yes| A
+    H -->|no| S{seed rule or<br/>cached LLM answer?}
+    S -->|seed| A
+    S -->|cache| AC[assign · source=cache]
+    S -->|no| P{person or UNKNOWN?}
+    P -->|yes| X[leave uncategorized<br/>never sent]
+    P -->|no| B[batch unique merchants]
+    B --> L[LLM · fixed category list]
+    L --> AL[assign · source=llm<br/>cache answer as rule]
+```
+
+| Module | Responsibility |
+|---|---|
+| `categorization/merchant.py` | Narration → `CleanMerchant(merchant, channel, keywords, is_person, is_atm)`. Splits on `/ - : \| *`, drops channel words, reference numbers, masked cards, UPI handles and domains (`HELP.UBER.COM` → `UBER`). |
+| `categorization/categorizer.py` | The layers above. Also handles user corrections (`apply_user_correction`) and `rules_version`. |
+| `categorization/seed_rules.py` | About 45 curated brand patterns, frozen in migration `0003`. |
+| `categorization/transfers.py` | Links equal-and-opposite amounts in two of your accounts within 3 days as own-account transfers. |
+
+**Rule matching.** A rule's words must appear as a contiguous run in the merchant name (`POWER` matches `CITY POWER UTILITY`). Priority decides first (user 100 > LLM cache 10 > seed 0), then the longer pattern. Built-in hints sit between user rules and seed rules.
+
+**Direction.** Money in that matches an expense category becomes *Income › Refunds*. A cached *income* answer is ignored for money out, so a salary payer's name never turns a payment to them into income.
+
+**Corrections.** `PATCH /api/transactions/{id}` sets the category (`source = user`) and replaces any rule for that merchant with a user rule. By default it also re-labels other non-manual rows with the same merchant. Deleting and re-inserting the rule gives it a new id, which is how `rules_version` (the highest rule id at categorization time) shows that newer rules exist.
+
+**Transfers.** Linked pairs get `is_transfer`, point at each other via `transfer_peer_id`, and are categorized *Transfers › Self Transfer*. Unlinking a pair sets `transfer_dismissed`, so the pair is never auto-linked again, and re-categorizes both sides.
+
+## Frontend (Phase 2)
+
+React + Vite + Tailwind, plain JSX. Three tabs (`#import`, `#transactions`, `#rules`):
+
+- **Import:** pick or create an account, upload, see the validation report. A `needs_review` import opens the **mapping review** form, which is prefilled from the stored mapping or guessed from the header names, with live validation and one-click date-format suggestions. It re-runs the import with the same in-memory `File`.
+- **Transactions:** a TanStack Table v9 view. Filtering and paging happen on the server; the table only renders the current page. Category edits happen inline, and badges show how each category was chosen (You / Rule / Cached / AI) and whether a row is an own-account transfer.
+- **Rules:** list and delete merchant rules.
+
+All network code is in `src/lib/api.js`. Form and format logic lives in `src/lib/*` and is unit-tested with Vitest. In development Vite proxies `/api` to `:8000`; in production FastAPI serves `frontend/dist` at `/`.
+
 ## Data model
 
 ```mermaid
@@ -87,12 +133,17 @@ erDiagram
 
 - **accounts**: bank name, nickname, currency, and `last4` only (a DB check constraint enforces 4 characters).
 - **imports**: file hash, file type, status, parser version, mapping and its source (`llm` or `user`), header labels, validation report, date range, opening/closing balance, counts.
-- **transactions**: date, signed amount (negative = money out), type, balance, currency, `raw_narration` (immutable), `row_index`, `dedupe_hash` (unique), plus categorization fields (`cleaned_merchant`, `category_id`, `category_source`, `rules_version`) and transfer fields (`is_transfer`, `transfer_peer_id`) used from Phase 2.
+- **transactions**: date, signed amount (negative = money out), type, balance, currency, `raw_narration` (immutable), `row_index`, `dedupe_hash` (unique), categorization fields (`cleaned_merchant` (indexed), `category_id`, `category_source`, `rules_version`), and transfer fields (`is_transfer`, `transfer_peer_id`, `transfer_dismissed`).
 - **categories**: a fixed two-level tree seeded by migration `0002`.
-- **merchant_rules**: pattern → category, with `source` of `seed`, `user` or `llm` (Phase 2).
+- **merchant_rules**: pattern → category, with `source` of `seed` (migration `0003`), `user` (corrections) or `llm` (cached answers) and a `priority`.
 
 Money is stored as `NUMERIC(18,4)`. SQLite is the default and Postgres works through `DATABASE_URL`. Migrations are hand-written, and `tests/test_migrations.py` checks that they produce exactly the schema the ORM models describe.
 
 ## Swapping the LLM
 
-`app/services/llm.py` is the only module that imports an LLM SDK. To use a different provider, implement `LLMClient.infer_schema(sample: MaskedSample) -> ColumnMapping` and return it from `build_llm_client`. Tests and demo mode use `FakeLLMClient`, which answers from the known mappings of the synthetic corpus.
+`app/services/llm.py` is the only module that imports an LLM SDK. To use a different provider, implement the two `LLMClient` methods and return your client from `build_llm_client`:
+
+- `infer_schema(sample: MaskedSample) -> ColumnMapping`
+- `categorize_merchants(merchants: Sequence[MaskedMerchant], categories: Sequence[str]) -> dict[int, str]`
+
+Tests and demo mode use `FakeLLMClient`. It answers from the known mappings of the synthetic corpus and from merchants registered in tests.
