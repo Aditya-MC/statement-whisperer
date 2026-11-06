@@ -116,15 +116,45 @@ flowchart TD
 
 **Transfers.** Linked pairs get `is_transfer`, point at each other via `transfer_peer_id`, and are categorized *Transfers › Self Transfer*. Unlinking a pair sets `transfer_dismissed`, so the pair is never auto-linked again, and re-categorizes both sides.
 
-## Frontend (Phase 2)
+## Dashboard analytics (Phase 3)
 
-React + Vite + Tailwind, plain JSX. Three tabs (`#import`, `#transactions`, `#rules`):
+`GET /api/analytics/dashboard` (`app/analytics.py`) returns everything the dashboard shows for one filter slice in a single response, so every number on the page agrees.
 
+| Field | Definition |
+|---|---|
+| excluded | `is_transfer` rows and anything categorized *Self Transfer*: moving money between your own accounts is neither income nor spending |
+| `income` | money in, minus refunds |
+| `spending` | money out, minus refunds (a refund undoes spending) |
+| `net` / `savings_rate` | income − spending; net ÷ income (null with no income) |
+| `series` | income and spending per bucket: weekly (Monday start) for ranges up to 45 days, otherwise monthly; empty buckets are filled |
+| `by_category` | money out per top-level category group, ranked; the 9th group onward folds into "Other (n)" (never a 9th chart colour) |
+| `top_merchants` | the 10 largest `cleaned_merchant`s by money out |
+| `recurring` | merchants with 3+ payments whose median gap is weekly (6–8 days) or monthly (25–35 days), with at least 70% of gaps within ±35% of the median and every amount within ±25% of the median amount. It looks back up to 400 days before the range end and drops merchants not seen for 1.5 gaps. |
+
+Payments to other people (*Transfer to Others*) are real money out and count as spending. Each response covers a single currency: the requested one, or the most common one among the account's transactions. Aggregation runs in Python with `Decimal`: it is exact and works the same on SQLite and Postgres.
+
+## Frontend
+
+React + Vite + Tailwind, plain JSX. Four tabs (`#dashboard`, `#transactions`, `#import`, `#rules`):
+
+- **Dashboard:**
+  - One filter row (period presets or a custom range, account, currency) scopes everything below it.
+  - Layout: hero figure (Spent), stat tiles, an income-vs-spending column chart, ranked category bars, top merchants, recurring payments.
+  - Every chart has a Table twin. While new data loads, the previous numbers stay on screen, dimmed.
+  - Clicking a category bar or merchant row opens the Transactions tab with the same filters (date range included).
+  - The Recharts code is lazy-loaded with this tab.
 - **Import:** pick or create an account, upload, see the validation report. A `needs_review` import opens the **mapping review** form, which is prefilled from the stored mapping or guessed from the header names, with live validation and one-click date-format suggestions. It re-runs the import with the same in-memory `File`.
 - **Transactions:** a TanStack Table v9 view. Filtering and paging happen on the server; the table only renders the current page. Category edits happen inline, and badges show how each category was chosen (You / Rule / Cached / AI) and whether a row is an own-account transfer.
 - **Rules:** list and delete merchant rules.
 
-All network code is in `src/lib/api.js`. Form and format logic lives in `src/lib/*` and is unit-tested with Vitest. In development Vite proxies `/api` to `:8000`; in production FastAPI serves `frontend/dist` at `/`.
+All network code is in `src/lib/api.js`. Form, format, date-preset and theme logic lives in `src/lib/*` and is unit-tested with Vitest. In development Vite proxies `/api` to `:8000`; in production FastAPI serves `frontend/dist` at `/`.
+
+### Theme and visual system
+
+- **Tokens:** colours are CSS variables in `src/index.css` (`--page`, `--surface`, `--ink`, `--line`, `--series-1`…), exposed to Tailwind via `@theme inline`. Components use roles (`bg-surface`, `text-muted`, `border-line`), never raw greys.
+- **Dark mode:** a `.dark` class on `<html>` swaps the tokens. Tailwind's `dark:` variant is redefined to follow that class, so the **Light / Dark / System** switch can override the OS. The choice is stored in `localStorage` (wrapped in try/catch), and a small inline script in `index.html` applies it before first paint, so there's no flash.
+- **Chart colours:** the reference data-viz palette. Income/spending use slot 1 (blue) and slot 2 (orange), validated for colour-blind separation and 3:1 contrast against both chart surfaces. Dark mode uses its own selected steps, not an inversion.
+- **Chart rules:** text never wears a series colour, status colours are kept for status, and bars are at most 24 px thick with a 4 px rounded end.
 
 ## Data model
 
