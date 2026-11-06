@@ -106,6 +106,28 @@ class MaskedSample:
     rows: tuple[tuple[str, ...], ...]
 
 
+@dataclass(frozen=True)
+class MaskedMerchant:
+    """A cleaned merchant name with identifiers masked, ready to send for categorization."""
+
+    id: int
+    merchant: str
+    direction: str  # "debit" | "credit"
+    hints: tuple[str, ...] = ()
+
+
+def build_masked_merchant(
+    id: int, merchant: str, direction: str, hints: tuple[str, ...] = ()
+) -> MaskedMerchant:
+    """Mask identifiers in a cleaned merchant name.
+
+    Callers must not pass person names: `categorization.merchant` flags person-to-person
+    payments, and the categorizer never sends those.
+    """
+    masked = mask_free_text(merchant)[:60]
+    return MaskedMerchant(id=id, merchant=masked, direction=direction, hints=hints)
+
+
 def build_masked_sample(
     header: list[str], rows: list[list[str]], max_rows: int = 10
 ) -> MaskedSample:

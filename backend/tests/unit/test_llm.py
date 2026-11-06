@@ -12,11 +12,13 @@ from app.services.llm import (
     AnthropicLLMClient,
     FakeLLMClient,
     LLMError,
+    MerchantCategorization,
+    MerchantCategory,
     UnavailableLLMClient,
     build_llm_client,
     render_schema_prompt,
 )
-from app.services.masking import build_masked_sample
+from app.services.masking import build_masked_merchant, build_masked_sample
 
 MAPPING = dict(
     date_column=0, description_columns=[1], amount_mode="signed", amount_column=2,
@@ -102,3 +104,56 @@ def test_build_llm_client_without_key_is_unavailable() -> None:
 def test_demo_mode_never_uses_network_client() -> None:
     client = build_llm_client(Settings(demo_mode=True, anthropic_api_key="sk-x", _env_file=None))  # type: ignore[call-arg]
     assert isinstance(client, FakeLLMClient)
+
+
+class SeqMessages:
+    """Stub returning a different response per call, recording every request."""
+
+    def __init__(self, responses: list[Any]) -> None:
+        self.responses = list(responses)
+        self.calls: list[dict[str, Any]] = []
+
+    def parse(self, **kwargs: Any) -> Any:
+        self.calls.append(kwargs)
+        return self.responses.pop(0)
+
+
+def test_categorize_merchants_batches_and_validates(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("app.services.llm.CATEGORIZE_BATCH_SIZE", 2)
+    cats = ["Food > Groceries", "Other > Uncategorized"]
+    names = ["SHOP A", "SHOP B", "SHOP C"]
+    merchants = [
+        build_masked_merchant(i, f"{name} 4111111111111111", "debit")
+        for i, name in enumerate(names)
+    ]
+    ok = SimpleNamespace(
+        stop_reason="end_turn",
+        parsed_output=MerchantCategorization(
+            results=[
+                MerchantCategory(id=0, category="Food > Groceries"),
+                MerchantCategory(id=1, category="Made Up > Category"),
+                MerchantCategory(id=99, category="Food > Groceries"),  # id we never asked for
+            ]
+        ),
+    )
+    last = SimpleNamespace(stop_reason="end_turn", parsed_output=MerchantCategorization(results=[]))
+    msgs = SeqMessages([ok, last])
+    client = AnthropicLLMClient(
+        api_key="t",
+        model="claude-opus-5-5",
+        sdk_client=SimpleNamespace(beta=SimpleNamespace(messages=msgs)),
+    )
+
+    out = client.categorize_merchants(merchants, cats)
+
+    assert out == {0: "Food > Groceries", 1: "Other > Uncategorized", 2: "Other > Uncategorized"}
+    assert len(msgs.calls) == 2
+    payload = json.loads(msgs.calls[0]["messages"][0]["content"])
+    assert payload["categories"] == cats
+    assert payload["merchants"][0] == {
+        "id": 0,
+        "merchant": "SHOP A <num>",
+        "direction": "debit",
+        "hints": [],
+    }
+    assert msgs.calls[0]["output_format"] is MerchantCategorization

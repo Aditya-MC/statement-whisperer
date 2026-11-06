@@ -1,33 +1,40 @@
 """The single gateway to any LLM.
 
 Nothing else in the codebase imports an LLM SDK. Everything here takes already-masked input
-(`MaskedSample`), so swapping providers or mocking in tests is a matter of providing another
-`LLMClient` implementation.
+(`MaskedSample`, `MaskedMerchant`), so swapping providers or mocking in tests is a matter of
+providing another `LLMClient` implementation.
+
+Two tasks:
+
+* `infer_schema`: column mapping from a masked header and sample rows (Phase 1).
+* `categorize_merchants`: one category per cleaned merchant name, chosen from the fixed
+  category list and batched (Phase 2).
 
 Implementations:
 
 * `AnthropicLLMClient` - Claude via the official SDK with structured (JSON-schema) output.
-* `FakeLLMClient` - deterministic, offline; answers from known mappings keyed by header.
+* `FakeLLMClient` - deterministic and offline. Answers from registered mappings and merchants.
   Used by tests and demo mode.
-* `UnavailableLLMClient` - used when no API key is configured. Every call raises `LLMError`,
-  so imports land in "needs review" and the user can map columns by hand.
+* `UnavailableLLMClient` - used when no API key is configured. Every call raises `LLMError`.
+  Imports then land in "needs review" and merchants stay uncategorized until rules cover them.
 """
 
 from __future__ import annotations
 
 import json
 import logging
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Any, Protocol, TypeVar
 
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
 
 from app.config import Settings
 from app.schemas.mapping import ColumnMapping, LLMColumnMapping
-from app.services.masking import MaskedSample, mask_header
+from app.services.masking import MaskedMerchant, MaskedSample, mask_header
 
 log = logging.getLogger(__name__)
+_T = TypeVar("_T", bound=BaseModel)
 
 #: Models that accept the server-side refusal fallback (`fallbacks: "default"`).
 _FALLBACK_MODELS = frozenset(
@@ -80,6 +87,62 @@ class LLMClient(Protocol):
         """Return a column mapping for the masked sample, or raise `LLMError`."""
         ...
 
+    def categorize_merchants(
+        self, merchants: Sequence[MaskedMerchant], categories: Sequence[str]
+    ) -> dict[int, str]:
+        """Map each merchant id to one of `categories` (exact strings), or raise `LLMError`."""
+        ...
+
+
+CATEGORIZE_BATCH_SIZE = 50
+UNCATEGORIZED = "Other > Uncategorized"
+
+CATEGORIZE_SYSTEM_PROMPT = f"""\
+You categorize bank transactions for a personal finance ledger.
+
+You receive a list of allowed categories and a list of merchants. Each merchant has an id, a \
+cleaned merchant name taken from a bank statement (identifiers masked as <num>, <upi>, \
+<email>), the direction ("debit" = money out, "credit" = money in), and optional hint keywords \
+found in the original narration (e.g. SALARY, REFUND, EMI).
+
+Return exactly one category per merchant id. The category must be copied exactly from the \
+allowed list. Use the direction: money in is usually Income or a refund, money out is usually \
+an expense. If you are not reasonably confident, use "{UNCATEGORIZED}". Do not invent \
+categories.\
+"""
+
+
+class MerchantCategory(BaseModel):
+    id: int
+    category: str
+
+
+class MerchantCategorization(BaseModel):
+    results: list[MerchantCategory]
+
+
+def render_categorize_prompt(merchants: Sequence[MaskedMerchant], categories: Sequence[str]) -> str:
+    payload = {
+        "categories": list(categories),
+        "merchants": [
+            {"id": m.id, "merchant": m.merchant, "direction": m.direction, "hints": list(m.hints)}
+            for m in merchants
+        ],
+    }
+    return json.dumps(payload, ensure_ascii=False, indent=1)
+
+
+def _validate_categories(
+    parsed: MerchantCategorization,
+    batch: Sequence[MaskedMerchant],
+    categories: Sequence[str],
+) -> dict[int, str]:
+    """Keep answers for ids we asked about; anything outside the fixed list is Uncategorized."""
+    allowed = set(categories)
+    wanted = {m.id for m in batch}
+    out = {r.id: (r.category if r.category in allowed else UNCATEGORIZED) for r in parsed.results}
+    return {i: out.get(i, UNCATEGORIZED) for i in wanted}
+
 
 def render_schema_prompt(sample: MaskedSample) -> str:
     """Column-oriented JSON view of the masked sample (easier for the model than raw rows)."""
@@ -115,14 +178,35 @@ class AnthropicLLMClient:
         self._effort = effort
 
     def infer_schema(self, sample: MaskedSample) -> ColumnMapping:
+        parsed = self._parse(SCHEMA_SYSTEM_PROMPT, render_schema_prompt(sample), LLMColumnMapping)
+        log.info("schema inferred by LLM model=%s", self._model)
+        return parsed.to_mapping()
+
+    def categorize_merchants(
+        self, merchants: Sequence[MaskedMerchant], categories: Sequence[str]
+    ) -> dict[int, str]:
+        results: dict[int, str] = {}
+        for start in range(0, len(merchants), CATEGORIZE_BATCH_SIZE):
+            batch = merchants[start : start + CATEGORIZE_BATCH_SIZE]
+            parsed = self._parse(
+                CATEGORIZE_SYSTEM_PROMPT,
+                render_categorize_prompt(batch, categories),
+                MerchantCategorization,
+            )
+            results.update(_validate_categories(parsed, batch, categories))
+        log.info("categorized %s merchants via LLM model=%s", len(results), self._model)
+        return results
+
+    def _parse(self, system: str, content: str, output_format: type[_T]) -> _T:
+        """One structured-output request with uniform error handling."""
         import anthropic
 
         kwargs: dict[str, Any] = {
             "model": self._model,
             "max_tokens": 16000,
-            "system": SCHEMA_SYSTEM_PROMPT,
-            "messages": [{"role": "user", "content": render_schema_prompt(sample)}],
-            "output_format": LLMColumnMapping,
+            "system": system,
+            "messages": [{"role": "user", "content": content}],
+            "output_format": output_format,
             "output_config": {"effort": self._effort},
         }
         if self._model in _FALLBACK_MODELS:
@@ -133,7 +217,7 @@ class AnthropicLLMClient:
         try:
             response = self._client.beta.messages.parse(**kwargs)
         except ValidationError as exc:
-            raise LLMError("LLM returned a mapping that failed validation") from exc
+            raise LLMError("LLM returned output that failed validation") from exc
         except anthropic.AuthenticationError as exc:
             raise LLMError("LLM authentication failed - check ANTHROPIC_API_KEY") from exc
         except anthropic.RateLimitError as exc:
@@ -150,8 +234,7 @@ class AnthropicLLMClient:
         parsed = response.parsed_output
         if parsed is None:
             raise LLMError("LLM returned no structured output")
-        log.info("schema inferred by LLM model=%s", self._model)
-        return parsed.to_mapping()
+        return parsed
 
 
 def header_key(header: Iterable[str]) -> tuple[str, ...]:
@@ -166,9 +249,25 @@ class FakeLLMClient:
 
     def __init__(self, mappings: dict[tuple[str, ...], ColumnMapping] | None = None) -> None:
         self._mappings: dict[tuple[str, ...], ColumnMapping] = {}
+        self._merchant_categories: dict[str, str] = {}
         self.calls: list[MaskedSample] = []
+        self.merchant_calls: list[list[MaskedMerchant]] = []
         for header, mapping in (mappings or {}).items():
             self.register(header, mapping)
+
+    def register_merchant(self, merchant: str, category: str) -> None:
+        self._merchant_categories[merchant.upper()] = category
+
+    def categorize_merchants(
+        self, merchants: Sequence[MaskedMerchant], categories: Sequence[str]
+    ) -> dict[int, str]:
+        self.merchant_calls.append(list(merchants))
+        allowed = set(categories)
+        out: dict[int, str] = {}
+        for m in merchants:
+            category = self._merchant_categories.get(m.merchant.upper(), UNCATEGORIZED)
+            out[m.id] = category if category in allowed else UNCATEGORIZED
+        return out
 
     def register(self, header: Iterable[str], mapping: ColumnMapping) -> None:
         # Lookups happen on the masked header (all the client ever sees), so mask here too.
@@ -196,6 +295,11 @@ class UnavailableLLMClient:
         self._reason = reason
 
     def infer_schema(self, sample: MaskedSample) -> ColumnMapping:
+        raise LLMError(self._reason)
+
+    def categorize_merchants(
+        self, merchants: Sequence[MaskedMerchant], categories: Sequence[str]
+    ) -> dict[int, str]:
         raise LLMError(self._reason)
 
 
