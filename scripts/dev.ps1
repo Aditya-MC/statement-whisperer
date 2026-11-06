@@ -9,10 +9,11 @@
     .\scripts\dev.ps1 migrate    # alembic upgrade head
     .\scripts\dev.ps1 run        # start the API on http://127.0.0.1:8000
     .\scripts\dev.ps1 samples    # regenerate synthetic statements
+    .\scripts\dev.ps1 demo       # build demo.db from synthetic data and serve it
 #>
 param(
     [Parameter(Position = 0)]
-    [ValidateSet('setup', 'test', 'lint', 'format', 'migrate', 'run', 'samples', 'help')]
+    [ValidateSet('setup', 'test', 'lint', 'format', 'migrate', 'run', 'samples', 'demo', 'help')]
     [string]$Task = 'help',
 
     [Parameter(ValueFromRemainingArguments = $true)]
@@ -80,6 +81,18 @@ switch ($Task) {
         Assert-Venv
         & $Py (Join-Path $Root 'samples\generate.py') @Rest
         exit $LASTEXITCODE
+    }
+    'demo' {
+        # Synthetic data only, separate demo.db, offline fake LLM. Never touches ledger.db.
+        Assert-Venv
+        Push-Location $Backend
+        try {
+            & $Py -m app.demo --reset
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            $env:DATABASE_URL = 'sqlite:///' + ((Join-Path $Backend 'demo.db') -replace '\\', '/')
+            $env:DEMO_MODE = 'true'
+            & $Py -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+        } finally { Pop-Location }
     }
     default {
         Get-Help $MyInvocation.MyCommand.Path -Detailed
