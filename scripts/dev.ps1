@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Task runner for the Bank Statement Analyzer (Windows replacement for a Makefile).
+    Task runner for Statement Whisperer (Windows replacement for a Makefile).
 
 .EXAMPLE
     .\scripts\dev.ps1 setup      # backend\.venv + frontend\node_modules (both local)

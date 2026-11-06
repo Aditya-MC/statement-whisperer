@@ -19,7 +19,7 @@ def create_app() -> FastAPI:
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
     app = FastAPI(
-        title="Bank Statement Analyzer",
+        title="Statement Whisperer",
         version=__version__,
         description="Bank-agnostic statement ingestion and personal finance ledger.",
     )

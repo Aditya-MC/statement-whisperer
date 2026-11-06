@@ -57,7 +57,7 @@ export default function App() {
     <div className="min-h-screen">
       <header className="border-b border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3">
-          <h1 className="text-lg font-semibold tracking-tight">Statement Ledger</h1>
+          <h1 className="text-lg font-semibold tracking-tight">Statement Whisperer</h1>
           <nav className="flex gap-1" aria-label="Sections">
             {TABS.map((t) => (
               <button

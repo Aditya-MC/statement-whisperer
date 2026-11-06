@@ -1,4 +1,6 @@
-# Bank Statement Analyzer
+# Statement Whisperer
+
+> Talks to any bank's statement so you don't have to.
 
 A personal-finance ledger that works with statements from any bank. Upload a CSV or XLSX statement (PDF support comes later). The app:
 
@@ -103,8 +105,8 @@ With a key, the AI only fills the gaps: new layouts, and merchants no rule cover
 Requirements: Python 3.11+, Node 20+ and Git.
 
 ```powershell
-git clone <your-repo-url> bank-statement-analyzer
-cd bank-statement-analyzer
+git clone https://github.com/Aditya-MC/statement-whisperer.git
+cd statement-whisperer
 copy .env.example .env            # set ANTHROPIC_API_KEY (optional, see Privacy)
 .\scripts\dev.ps1 setup           # backend\.venv + frontend\node_modules, both inside the project
 .\scripts\dev.ps1 migrate         # creates backend\ledger.db
