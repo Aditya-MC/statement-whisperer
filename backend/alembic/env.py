@@ -42,6 +42,14 @@ def run_migrations_online() -> None:
 
 
 def _run(connection) -> None:  # type: ignore[no-untyped-def]
+    sqlite = connection.dialect.name == "sqlite"
+    if sqlite:
+        # Batch mode rebuilds a table (copy, DROP, rename). With foreign keys enforced, the DROP
+        # would fire ON DELETE CASCADE / SET NULL on every referencing row and silently wipe
+        # data (sub-categories, merchant rules, transaction categories). Enforcement must be
+        # off for the migration; the PRAGMA only works outside a transaction.
+        connection.exec_driver_sql("PRAGMA foreign_keys=OFF")
+        connection.commit()
     context.configure(
         connection=connection,
         target_metadata=target_metadata,
@@ -50,6 +58,13 @@ def _run(connection) -> None:  # type: ignore[no-untyped-def]
     )
     with context.begin_transaction():
         context.run_migrations()
+        if sqlite:
+            broken = connection.exec_driver_sql("PRAGMA foreign_key_check").fetchall()
+            if broken:
+                raise RuntimeError(f"Migration left {len(broken)} broken foreign key reference(s)")
+    if sqlite:
+        connection.exec_driver_sql("PRAGMA foreign_keys=ON")
+        connection.commit()
 
 
 if context.is_offline_mode():
