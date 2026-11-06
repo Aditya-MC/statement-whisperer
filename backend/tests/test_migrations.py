@@ -12,9 +12,11 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.categories import CATEGORY_TREE
+from app.categorization.categorizer import load_category_index
+from app.categorization.seed_rules import SEED_RULES
 from app.config import BACKEND_DIR
 from app.db import Base, make_engine
-from app.models import Category
+from app.models import Category, MerchantRule, RuleSource
 
 
 def _config(url: str) -> Config:
@@ -41,6 +43,15 @@ def test_upgrade_matches_models_and_seeds_categories(tmp_path: Path) -> None:
         assert {g.name for g in groups} == {name for name, _, _ in CATEGORY_TREE}
         total = len(s.scalars(select(Category)).all())
         assert total == sum(1 + len(children) for _, _, children in CATEGORY_TREE)
+
+        # Seed merchant rules in migration 0003 match app/categorization/seed_rules.py.
+        idx = load_category_index(s)
+        path_by_id = {i: p for p, i in idx.by_path.items()}
+        seeded = {
+            (r.pattern, path_by_id[r.category_id])
+            for r in s.scalars(select(MerchantRule).where(MerchantRule.source == RuleSource.seed))
+        }
+        assert seeded == set(SEED_RULES)
     engine.dispose()
 
     command.downgrade(cfg, "base")
