@@ -25,7 +25,7 @@ Preamble lines above the header (bank name, account holder, account number, addr
 - the **cleaned merchant name** (e.g. `SWIGGY`, `CITY POWER UTILITY`). `mask_free_text` then removes any remaining emails, UPI handles and phone/card/account numbers;
 - the direction (`debit` / `credit`);
 - hint keywords from a fixed list (`SALARY`, `REFUND`, `EMI`…);
-- the fixed category list.
+- the category list (built-in categories plus any you've added, so don't put anything private in a category name).
 
 Not sent: raw narrations, amounts, dates, balances, account details, or **person names**. Person-to-person payments (IMPS/NEFT/UPI/cheque to something that looks like a name) are flagged during merchant cleanup, categorized locally as *Transfer to Others*, and never sent. The detection is a heuristic that errs toward treating names as people, which costs some accuracy in exchange for privacy. For example, in UPI narrations a payee that is a raw handle (`…@pty`), a phone number, or a lone word with no business signal counts as a person. A correction fixes it for good. Each merchant is sent at most once, and the answer is cached as a rule.
 

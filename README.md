@@ -19,7 +19,9 @@ There is no parser per bank. An LLM looks at a small, masked sample to infer the
 |---|---|
 | ![Dashboard, light theme](docs/screenshots/dashboard-light.png) | ![Dashboard, dark theme](docs/screenshots/dashboard-dark.png) |
 
-![Transactions with inline category editing](docs/screenshots/transactions.png)
+| Transactions with inline category editing | Categories (built-in + your own) |
+|---|---|
+| ![Transactions](docs/screenshots/transactions.png) | ![Categories](docs/screenshots/categories.png) |
 
 _Demo mode, synthetic data only._
 
@@ -76,7 +78,8 @@ One filter row (period, account, currency) scopes everything below it:
 
 - **Spent** (the headline figure), plus **income**, **net saved** and **savings rate**.
 - **Income vs spending:** per week for ranges up to 45 days, per month beyond that.
-- **Spending by category:** ranked, with the top 8 shown and the rest folded into "Other". Click a bar to open its transactions.
+- **Where the money went:** a donut chart of your top 5 category groups plus "Other". Each group keeps its colour when you change filters, because colours follow the group's all-time rank.
+- **Spending by category:** ranked, with the top 8 shown and the rest folded into "Other". Click a bar or slice to open its transactions.
 - **Top merchants:** click a row to open its transactions.
 - **Recurring payments:** merchants paid weekly or monthly at a similar amount, with the next expected date and the cost per month.
 
@@ -91,6 +94,8 @@ Every chart has a **Table** view, so no value is only visible on hover. Chart co
 
 1. **Merchant cleanup:** `UPI/412345678901/SWIGGY/jdoe@okaxis/Payment` becomes `SWIGGY`. Channel prefixes, reference numbers, card digits and UPI handles are stripped.
 2. **Your rules:** every manual correction is saved as a rule and wins over everything else. It is also applied to other transactions with the same merchant.
+
+**Custom categories.** Add your own on the **Categories** tab, or pick "＋ New category…" from any transaction's category menu. A new category can go under an existing group or in a new group (counted as spending, income or transfer). Your own categories can be renamed or deleted; deleting one makes its transactions uncategorized and removes its rules. Built-in categories are locked, because the categorizer refers to them by name.
 3. **Built-in hints:** ATM withdrawals, SALARY/INTEREST/REFUND credits, and EMI/SIP/RENT/fee debits. Person-to-person payments are categorized as *Transfer to Others* and their names are never sent to the LLM.
 4. **Seed rules:** about 60 common brands (Swiggy, Amazon, Uber, Netflix, Shell, Jio, Vodafone…). They're checked before the person heuristic, so a bank-truncated `VODAFONE IDEA` still counts as a phone bill.
 5. **Cache:** earlier LLM answers, stored as rules.
@@ -176,7 +181,10 @@ All settings come from environment variables or `.env`. See [`.env.example`](.en
 |---|---|---|
 | `POST` | `/api/accounts` | Create an account (`last4` only) |
 | `GET` | `/api/accounts` | List accounts |
-| `GET` | `/api/categories` | The fixed category tree |
+| `GET` | `/api/categories` | The category tree (built-in and custom) |
+| `POST` | `/api/categories` | Add a category (`name`, `parent_id` for an existing group, or `kind` for a new group) |
+| `PATCH` | `/api/categories/{id}` | Rename a custom category |
+| `DELETE` | `/api/categories/{id}` | Delete a custom category (its transactions become uncategorized) |
 | `POST` | `/api/imports` | Upload a statement (`account_id`, `file`, optional `mapping` JSON) |
 | `GET` | `/api/imports/{id}` | Import status, validation report, mapping |
 | `GET` | `/api/imports` | List imports (`?account_id=`) |
@@ -213,6 +221,6 @@ scripts/    dev.ps1 task runner
 
 - [x] **Phase 1:** scaffolding, schema + migrations, CSV/XLSX ingestion with LLM schema inference, validation, dedupe, import API, tests
 - [x] **Phase 2:** layered categorizer (merchant cleanup → rules → cache → LLM), correction loop, own-account transfers, transactions table and mapping review UI, Docker files (untested)
-- [x] **Phase 3:** dashboard (categories, trends, income vs expense, top merchants, recurring payments, savings rate), light/dark theme
+- [x] **Phase 3:** dashboard (categories, trends, income vs expense, top merchants, recurring payments, savings rate), light/dark theme, custom categories, category donut chart
 - [ ] **Phase 4:** text PDFs, password-protected PDFs, scanned/image fallback
 - [ ] **Phase 5:** export, automatic backups, year-over-year analytics, anomaly flags
