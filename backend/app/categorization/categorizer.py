@@ -6,10 +6,12 @@ For each transaction (never one the user categorized by hand):
    in `cleaned_merchant`.
 2. **User rules** (`merchant_rules.source = user`, highest priority).
 3. **Built-in hints**: ATM withdrawals, SALARY/INTEREST/REFUND credits, EMI/SIP/RENT/fee
-   debits, and person-to-person payments (Transfer to Others, never sent to the LLM).
+   debits.
 4. **Seed rules**: curated brand patterns such as SWIGGY -> Food Delivery.
 5. **Cache**: earlier LLM answers, stored as `merchant_rules.source = llm`.
-6. **LLM**: the remaining unique merchants are sent in one batched request with the fixed
+6. **People**: person-to-person payments become Transfer to Others and are never sent to the
+   LLM. This runs after brand rules, so a truncated "VODAFONE IDEA" still matches VODAFONE.
+7. **LLM**: the remaining unique merchants are sent in one batched request with the fixed
    category list. Answers are cached as rules for next time.
 
 A rule matches when its words appear as a contiguous run in the merchant name. Higher priority
@@ -140,8 +142,6 @@ def heuristic_category(clean: CleanMerchant, is_credit: bool) -> str | None:
             return "Financial > Taxes"
         if kw & {"FEE", "FEES", "CHARGES", "CHARGE", "GST"}:
             return "Financial > Bank Fees"
-    if clean.is_person:
-        return TRANSFER_TO_OTHERS
     return None
 
 
@@ -235,8 +235,13 @@ def categorize_transactions(
             source = CategorySource.cache if rule.source == RuleSource.llm else CategorySource.rule
             assigner.assign(t, rule.category_id, source)
             continue
-        if clean.is_person or clean.merchant == "UNKNOWN":
-            t.category_id, t.category_source = None, None  # never sent to the LLM
+        # Payments to people: after brand rules (so "VODAFONE IDEA" isn't mistaken for a
+        # person) and never sent to the LLM.
+        if clean.is_person and TRANSFER_TO_OTHERS in idx.by_path:
+            assigner.assign(t, idx.by_path[TRANSFER_TO_OTHERS], CategorySource.rule)
+            continue
+        if clean.merchant == "UNKNOWN":
+            t.category_id, t.category_source = None, None  # nothing useful to send
             continue
         key = f"{clean.merchant}|{'credit' if is_credit else 'debit'}"
         pending[key].append(t)

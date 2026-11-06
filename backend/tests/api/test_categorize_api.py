@@ -21,8 +21,8 @@ def csv_statement(rows: list[tuple[str, str, str]], opening: str = "1000.00") ->
 ROWS = [
     ("01/03/2024", "NEFT CR-0012345678-ACME CORP-SALARY", "2500.00"),
     ("02/03/2024", "UPI/0012345678/SWIGGY/jdoe@okaxis", "-18.50"),
-    ("03/03/2024", "POS XXXX1234 CORNER BAKERY", "-6.25"),
-    ("04/03/2024", "POS XXXX5678 CORNER BAKERY", "-4.75"),
+    ("03/03/2024", "POS XXXX1234 QUIRKY KIOSK", "-6.25"),
+    ("04/03/2024", "POS XXXX5678 QUIRKY KIOSK", "-4.75"),
     ("05/03/2024", "IMPS-0012345678-JOHN Q PUBLIC-SPLIT", "-40.00"),
 ]
 
@@ -60,16 +60,16 @@ def test_import_categorizes_automatically(client: TestClient, llm: FakeLLMClient
     assert by_merchant["SWIGGY"]["category_id"] == cats["Food > Food Delivery"]
     assert by_merchant["ACME CORP"]["category_id"] == cats["Income > Salary"]
     assert by_merchant["JOHN Q PUBLIC"]["category_id"] == cats["Transfers > Transfer to Others"]
-    assert by_merchant["CORNER BAKERY"]["category_source"] == "llm"  # fake says Uncategorized
+    assert by_merchant["QUIRKY KIOSK"]["category_source"] == "llm"  # fake says Uncategorized
     sent = {m.merchant for batch in llm.merchant_calls for m in batch}
-    assert sent == {"CORNER BAKERY"}
+    assert sent == {"QUIRKY KIOSK"}
 
 
 def test_correction_saves_rule_and_updates_similar(client: TestClient, llm: FakeLLMClient) -> None:
     acct = make_account(client)
     upload(client, acct, csv_statement(ROWS))
     cats = categories(client)
-    bakery = [t for t in txns(client) if t["cleaned_merchant"] == "CORNER BAKERY"]
+    bakery = [t for t in txns(client) if t["cleaned_merchant"] == "QUIRKY KIOSK"]
 
     r = client.patch(
         f"/api/transactions/{bakery[0]['id']}", json={"category_id": cats["Food > Groceries"]}
@@ -82,7 +82,7 @@ def test_correction_saves_rule_and_updates_similar(client: TestClient, llm: Fake
     after = {t["id"]: t for t in txns(client)}
     assert after[bakery[1]["id"]]["category_id"] == cats["Food > Groceries"]
     rules = client.get("/api/merchant-rules", params={"source": "user"}).json()
-    assert [r["pattern"] for r in rules] == ["CORNER BAKERY"]
+    assert [r["pattern"] for r in rules] == ["QUIRKY KIOSK"]
 
     grocery_rows = txns(client, category_id=cats["Food > Groceries"])
     assert len(grocery_rows) == 2
@@ -97,7 +97,7 @@ def test_parent_category_filter_and_search(client: TestClient, llm: FakeLLMClien
         if c["name"] == "Food" and c["parent_id"] is None
     )
     assert {t["cleaned_merchant"] for t in txns(client, category_id=food_group)} == {"SWIGGY"}
-    assert len(txns(client, q="bakery")) == 2
+    assert len(txns(client, q="kiosk")) == 2
     assert len(txns(client, q="100%")) == 0  # wildcards are escaped
 
 
@@ -113,17 +113,17 @@ def test_unknown_category_is_422(client: TestClient, llm: FakeLLMClient) -> None
 def test_recategorize_endpoint_and_rule_delete(client: TestClient, llm: FakeLLMClient) -> None:
     acct = make_account(client)
     upload(client, acct, csv_statement(ROWS))
-    llm.register_merchant("CORNER BAKERY", "Food > Restaurants")
+    llm.register_merchant("QUIRKY KIOSK", "Food > Restaurants")
     r = client.post("/api/categorize", json={"account_id": acct}).json()
     assert r["processed"] == 5 and r["llm_merchants"] == 1 and r["llm_error"] is None
     cats = categories(client)
-    bakery = [t for t in txns(client) if t["cleaned_merchant"] == "CORNER BAKERY"]
+    bakery = [t for t in txns(client) if t["cleaned_merchant"] == "QUIRKY KIOSK"]
     assert all(t["category_id"] == cats["Food > Restaurants"] for t in bakery)
 
     rule = next(
         x
         for x in client.get("/api/merchant-rules", params={"source": "llm"}).json()
-        if x["pattern"] == "CORNER BAKERY"
+        if x["pattern"] == "QUIRKY KIOSK"
     )
     assert client.delete(f"/api/merchant-rules/{rule['id']}").status_code == 204
     assert client.delete(f"/api/merchant-rules/{rule['id']}").status_code == 404
