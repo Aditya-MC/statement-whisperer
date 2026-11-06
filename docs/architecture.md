@@ -103,9 +103,9 @@ flowchart TD
 
 | Module | Responsibility |
 |---|---|
-| `categorization/merchant.py` | Narration → `CleanMerchant(merchant, channel, keywords, is_person, is_atm)`. Splits on `/ - : \| *`, drops channel words, reference numbers, masked cards, UPI handles and domains (`HELP.UBER.COM` → `UBER`). |
+| `categorization/merchant.py` | Narration → `CleanMerchant(merchant, channel, keywords, is_person, is_atm)`. Splits on `/ - : \| *`, drops channel words, reference numbers, masked cards, UPI handles, domains (`HELP.UBER.COM` → `UBER`) and NEFT IFSC bank codes. `UPI/<ref>/<DR\|CR>/<payee>/<bank>/…` narrations are parsed by position: the payee is the merchant, raw handles and phone numbers count as people, and bank-truncated business names (`SRI SAI SERVIC`) aren't mistaken for people. |
 | `categorization/categorizer.py` | The layers above. Also handles user corrections (`apply_user_correction`) and `rules_version`. |
-| `categorization/seed_rules.py` | About 45 curated brand patterns, frozen in migration `0003`. |
+| `categorization/seed_rules.py` | About 60 curated brand patterns, frozen in migrations `0003` and `0004`. |
 | `categorization/transfers.py` | Links equal-and-opposite amounts in two of your accounts within 3 days as own-account transfers. |
 
 **Rule matching.** A rule's words must appear as a contiguous run in the merchant name (`POWER` matches `CITY POWER UTILITY`). Priority decides first (user 100 > LLM cache 10 > seed 0), then the longer pattern. Built-in hints sit between user rules and seed rules.

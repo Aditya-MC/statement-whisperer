@@ -58,6 +58,22 @@ SEED_RULES: list[tuple[str, str]] = [
     ("HOSPITAL", "Health > Medical"),
     ("GYM", "Health > Fitness"),
     ("MUTUAL FUND", "Financial > Investments"),
+    # Migration 0004: brands common in Indian UPI statements.
+    ("VODAFONE", "Bills > Mobile & Internet"),
+    ("MYJIO", "Bills > Mobile & Internet"),
+    ("BSNL", "Bills > Mobile & Internet"),
+    ("GOOGLE", "Bills > Subscriptions"),
+    ("PUMP", "Transport > Fuel"),
+    ("RAPIDO", "Transport > Ride Hailing"),
+    ("REDBUS", "Leisure > Travel"),
+    ("DMART", "Food > Groceries"),
+    ("MILK", "Food > Groceries"),
+    ("DAIRY", "Food > Groceries"),
+    ("BAKERY", "Food > Restaurants"),
+    ("SWEETS", "Food > Restaurants"),
+    ("MEDICALS", "Health > Pharmacy"),
+    ("PHARMEASY", "Health > Pharmacy"),
+    ("APY", "Financial > Investments"),
 ]
 
 

@@ -127,8 +127,8 @@ def test_credit_from_expense_merchant_is_refund(db: Session, imp: Import) -> Non
 
 def test_user_correction_creates_rule_and_applies_to_similar(db: Session, imp: Import) -> None:
     llm = FakeLLMClient()
-    a = add_txn(db, imp, "POS XXXX1234 CORNER BAKERY", "-5.00")
-    b = add_txn(db, imp, "POS XXXX5678 CORNER BAKERY", "-7.00", d=2)
+    a = add_txn(db, imp, "POS XXXX1234 QUIRKY KIOSK", "-5.00")
+    b = add_txn(db, imp, "POS XXXX5678 QUIRKY KIOSK", "-7.00", d=2)
     categorize_transactions(db, llm, [a, b])
     groceries = load_category_index(db).by_path["Food > Groceries"]
 
@@ -136,11 +136,11 @@ def test_user_correction_creates_rule_and_applies_to_similar(db: Session, imp: I
     assert changed == 1
     assert a.category_source == CategorySource.user and path_of(db, a) == "Food > Groceries"
     assert b.category_source == CategorySource.rule and path_of(db, b) == "Food > Groceries"
-    rule = db.scalar(select(MerchantRule).where(MerchantRule.pattern == "CORNER BAKERY"))
+    rule = db.scalar(select(MerchantRule).where(MerchantRule.pattern == "QUIRKY KIOSK"))
     assert rule is not None and rule.source == RuleSource.user
 
     # Future rows use the user rule, ahead of everything else.
-    c = add_txn(db, imp, "POS XXXX9999 CORNER BAKERY", "-6.00", d=3)
+    c = add_txn(db, imp, "POS XXXX9999 QUIRKY KIOSK", "-6.00", d=3)
     categorize_transactions(db, llm, [c])
     assert path_of(db, c) == "Food > Groceries" and c.category_source == CategorySource.rule
     assert a.rules_version is not None and c.rules_version == a.rules_version
@@ -176,3 +176,21 @@ def test_no_transfers_with_single_account(db: Session, imp: Import) -> None:
     add_txn(db, imp, "A", "-50.00")
     add_txn(db, imp, "B", "50.00")
     assert link_transfers(db) == 0
+
+
+def test_brand_rules_beat_person_heuristic(db: Session, imp: Import) -> None:
+    """Truncated brand payees look like names but must hit brand rules, not Transfer to Others."""
+    rows = {
+        "UPI/600000000001/DR/Vodafone Idea /KKB/UPI": "Bills > Mobile & Internet",
+        "UPI/600000000002/DR/         MYJIO/HDF/Pay": "Bills > Mobile & Internet",
+        "UPI/600000000003/DR/PUMP 14 EXAMPL /YES/UPI": "Transport > Fuel",
+        "UPI/600000000004/DR/  Jane Doe Q/SBI/UPI": "Transfers > Transfer to Others",
+        "600000000005-ATM-WSG SOMEPLACE CITY TNI": "Cash > ATM Withdrawal",
+        "APY/SI/OCTOBER 2026": "Financial > Investments",
+    }
+    txns = {n: add_txn(db, imp, n, "-100.00") for n in rows}
+    llm = FakeLLMClient()
+    categorize_transactions(db, llm, list(txns.values()))
+    for narration, expected in rows.items():
+        assert path_of(db, txns[narration]) == expected, narration
+    assert llm.merchant_calls == []  # nothing here needed (or was allowed to reach) the LLM

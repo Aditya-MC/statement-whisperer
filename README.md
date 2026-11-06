@@ -71,7 +71,7 @@ Also handled: CSV with no header, CP1252/Latin-1 encodings, repeated header rows
 1. **Merchant cleanup:** `UPI/412345678901/SWIGGY/jdoe@okaxis/Payment` becomes `SWIGGY`. Channel prefixes, reference numbers, card digits and UPI handles are stripped.
 2. **Your rules:** every manual correction is saved as a rule and wins over everything else. It is also applied to other transactions with the same merchant.
 3. **Built-in hints:** ATM withdrawals, SALARY/INTEREST/REFUND credits, and EMI/SIP/RENT/fee debits. Person-to-person payments are categorized as *Transfer to Others* and their names are never sent to the LLM.
-4. **Seed rules:** about 45 common brands (Swiggy, Amazon, Uber, Netflix, Shell…).
+4. **Seed rules:** about 60 common brands (Swiggy, Amazon, Uber, Netflix, Shell, Jio, Vodafone…). They're checked before the person heuristic, so a bank-truncated `VODAFONE IDEA` still counts as a phone bill.
 5. **Cache:** earlier LLM answers, stored as rules.
 6. **LLM:** the remaining unique merchants are sent in one batch, with a fixed category list and structured output.
 
