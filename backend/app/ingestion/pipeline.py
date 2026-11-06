@@ -1,7 +1,7 @@
 """End-to-end import of one statement file.
 
     bytes -> detect type -> raw table -> header split -> mapping (LLM or user)
-          -> normalize -> validate -> dedupe -> insert
+          -> normalize -> validate -> dedupe -> insert -> categorize -> link transfers
 
 The file's bytes live only in memory for the duration of this call. Nothing is written to disk
 and nothing from the file is logged.
@@ -14,6 +14,8 @@ import logging
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.categorization.categorizer import categorize_transactions
+from app.categorization.transfers import link_transfers
 from app.ingestion import PARSER_VERSION
 from app.ingestion.dedupe import chunked, file_sha256, transaction_hashes
 from app.ingestion.detect import FileType, detect_file_type, ensure_supported
@@ -92,10 +94,12 @@ def ingest(
         db.add(imp)
 
     try:
-        _run(db, llm, account, imp, data, file_type, mapping_override)
+        new_rows = _run(db, llm, account, imp, data, file_type, mapping_override)
     except Exception:
         db.rollback()
         raise
+    if new_rows:
+        _categorize_new(db, llm, new_rows)
     db.commit()
     log.info(
         "import id=%s status=%s rows=%s inserted=%s duplicates=%s",
@@ -112,14 +116,15 @@ def _run(
     data: bytes,
     file_type: FileType,
     mapping_override: ColumnMapping | None,
-) -> None:
+) -> list[Transaction]:
+    """Run the import; returns the newly inserted transactions (empty unless completed)."""
     try:
         table = _prepare(data, file_type)
     except FileReadError as exc:
         imp.status = ImportStatus.failed
         imp.error_message = str(exc)
         db.flush()
-        return
+        return []
 
     imp.columns = [h[:_MAX_HEADER_LABEL] for h in table.header]
 
@@ -134,7 +139,7 @@ def _run(
             imp.mapping = None
             imp.error_message = f"Automatic column detection failed: {exc}"
             db.flush()
-            return
+            return []
     imp.mapping = mapping.model_dump(mode="json")
 
     try:
@@ -143,7 +148,7 @@ def _run(
         imp.status = ImportStatus.needs_review
         imp.error_message = str(exc)
         db.flush()
-        return
+        return []
 
     report = validate(result)
     if mapping.currency != account.currency:
@@ -161,7 +166,7 @@ def _run(
         imp.status = ImportStatus.needs_review
         imp.error_message = "Validation failed - review the column mapping"
         db.flush()
-        return
+        return []
 
     chrono, _ = order_chronologically(result.transactions)
     hashes = transaction_hashes(account.id, chrono)
@@ -172,31 +177,50 @@ def _run(
         )
 
     db.flush()  # assigns imp.id
-    inserted = 0
+    new_rows: list[Transaction] = []
     for idx, (txn, h) in enumerate(zip(chrono, hashes, strict=True)):
         if h in existing_hashes:
             continue
-        db.add(
-            Transaction(
-                account_id=account.id,
-                import_id=imp.id,
-                date=txn.date,
-                amount=txn.amount,
-                type=TxnType.debit if txn.amount < 0 else TxnType.credit,
-                balance=txn.balance,
-                currency=mapping.currency,
-                raw_narration=txn.raw_narration,
-                row_index=idx,
-                dedupe_hash=h,
-            )
+        row = Transaction(
+            account_id=account.id,
+            import_id=imp.id,
+            date=txn.date,
+            amount=txn.amount,
+            type=TxnType.debit if txn.amount < 0 else TxnType.credit,
+            balance=txn.balance,
+            currency=mapping.currency,
+            raw_narration=txn.raw_narration,
+            row_index=idx,
+            dedupe_hash=h,
         )
-        inserted += 1
+        db.add(row)
+        new_rows.append(row)
 
-    imp.inserted_count = inserted
-    imp.duplicate_count = len(hashes) - inserted
+    imp.inserted_count = len(new_rows)
+    imp.duplicate_count = len(hashes) - len(new_rows)
     imp.status = ImportStatus.completed
     imp.completed_at = utcnow()
     db.flush()
+    return new_rows
+
+
+def _categorize_new(db: Session, llm: LLMClient, rows: list[Transaction]) -> None:
+    """Categorize freshly imported rows and link transfers.
+
+    Runs in a savepoint: if anything here fails, the validated import is still kept and its
+    transactions simply stay uncategorized (POST /api/categorize can retry later).
+    """
+    try:
+        with db.begin_nested():
+            result = categorize_transactions(db, llm, rows)
+            pairs = link_transfers(db)
+        log.info(
+            "categorized rows=%s sources=%s llm_merchants=%s uncategorized=%s transfers=%s",
+            result.processed, dict(result.by_source), result.llm_merchants,
+            result.uncategorized, pairs,
+        )  # fmt: skip
+    except Exception:
+        log.exception("categorization failed; import kept uncategorized")
 
 
 def _apply_report(imp: Import, report: ValidationReport) -> None:

@@ -16,6 +16,9 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
 )
+from sqlalchemy import (
+    false as sa_false,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base
@@ -62,7 +65,7 @@ class Transaction(Base):
     row_index: Mapped[int] = mapped_column(Integer)
     dedupe_hash: Mapped[str] = mapped_column(String(64))
 
-    cleaned_merchant: Mapped[str | None] = mapped_column(String(200))
+    cleaned_merchant: Mapped[str | None] = mapped_column(String(200), index=True)
     category_id: Mapped[int | None] = mapped_column(
         ForeignKey("categories.id", ondelete="SET NULL"), index=True
     )
@@ -75,6 +78,10 @@ class Transaction(Base):
     is_transfer: Mapped[bool] = mapped_column(Boolean, default=False)
     transfer_peer_id: Mapped[int | None] = mapped_column(
         ForeignKey("transactions.id", ondelete="SET NULL")
+    )
+    #: Set when the user unlinks a detected transfer, so it is never auto-linked again.
+    transfer_dismissed: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=sa_false()
     )
 
     created_at: Mapped[dt.datetime] = mapped_column(DateTime, default=utcnow)

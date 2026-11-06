@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session, sessionmaker
 import app.models  # noqa: F401
 from app.api.deps import get_llm
 from app.categories import seed_categories
+from app.categorization.seed_rules import seed_merchant_rules
 from app.config import REPO_ROOT
 from app.db import Base, get_db, make_engine
 from app.models import Account
@@ -58,6 +59,7 @@ def engine() -> Iterator[Engine]:
     Base.metadata.create_all(eng)
     with Session(eng) as s:
         seed_categories(s)
+        seed_merchant_rules(s)
         s.commit()
     yield eng
     eng.dispose()

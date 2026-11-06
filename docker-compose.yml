@@ -1,0 +1,31 @@
+# UNTESTED until Docker Desktop is installed (move its disk image to D: first).
+#
+#   docker compose up --build                 # your ledger on http://localhost:8000
+#   docker compose --profile demo up --build  # synthetic demo on http://localhost:8001
+#
+# Database files live in ./data inside the project folder (git-ignored).
+services:
+  app:
+    build: .
+    ports:
+      - "127.0.0.1:8000:8000"   # bound to localhost only
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATABASE_URL: sqlite:////app/data/ledger.db
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
+
+  demo:
+    profiles: ["demo"]
+    build: .
+    ports:
+      - "127.0.0.1:8001:8000"
+    environment:
+      DEMO_MODE: "true"
+      LLM_PROVIDER: fake
+      DATABASE_URL: sqlite:////app/backend/demo.db
+    # Rebuilt from synthetic samples on every start; no API key, no real data.
+    command: ["sh", "-c", "python -m app.demo --reset && uvicorn app.main:app --host 0.0.0.0 --port 8000"]

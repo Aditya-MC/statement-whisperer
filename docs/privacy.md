@@ -20,11 +20,18 @@ This app handles bank statements, so it is built to keep as little as possible a
 
 Preamble lines above the header (bank name, account holder, account number, address) are never sent. Neither are rows beyond the sample or file names.
 
-**Phase 2 (categorization, planned):** only cleaned merchant strings, such as `SWIGGY` or `AMAZON MKTPLACE`, after `mask_free_text` has removed emails, UPI handles, phone/card/account numbers and other long digit runs. Each merchant is sent once and the result is cached.
+**Phase 2 (categorization): only for merchants no rule or cache entry covers**, one batched request per import, containing for each unique merchant:
 
-The masking code is in `backend/app/services/masking.py`. The LLM gateway accepts only a `MaskedSample` (`backend/app/services/llm.py`), and `tests/test_synthetic_corpus.py` checks for every sample layout that no narration text reaches the LLM.
+- the **cleaned merchant name** (e.g. `SWIGGY`, `CITY POWER UTILITY`). `mask_free_text` then removes any remaining emails, UPI handles and phone/card/account numbers;
+- the direction (`debit` / `credit`);
+- hint keywords from a fixed list (`SALARY`, `REFUND`, `EMI`…);
+- the fixed category list.
 
-With no API key configured, or in demo mode, nothing is sent anywhere. Imports land in `needs_review` and you map the columns yourself.
+Not sent: raw narrations, amounts, dates, balances, account details, or **person names**. Person-to-person payments (IMPS/NEFT/UPI/cheque to something that looks like a name) are flagged during merchant cleanup, categorized locally as *Transfer to Others*, and never sent. The detection is a heuristic: it errs toward treating two-word names as people, which costs some accuracy in exchange for privacy. A correction fixes it for good. Each merchant is sent at most once, and the answer is cached as a rule.
+
+The masking code is in `backend/app/services/masking.py`. The LLM gateway accepts only `MaskedSample` / `MaskedMerchant` inputs (`backend/app/services/llm.py`). Tests check that no narration text reaches the LLM for any sample layout (`tests/test_synthetic_corpus.py`) and that person names and rule-covered merchants are never sent (`tests/test_categorizer.py`).
+
+With no API key configured, or in demo mode, nothing is sent anywhere. Imports land in `needs_review` where you map the columns yourself, and categorization uses rules and built-in hints only.
 
 ## What is stored
 
@@ -34,10 +41,11 @@ With no API key configured, or in demo mode, nothing is sent anywhere. Imports l
 | SHA-256 hash of each uploaded file (for duplicate detection) | File names |
 | The column mapping and the statement's header labels | Full account numbers (only `last4`, enforced by a DB constraint and API validation) |
 | A validation report (row numbers and messages, no cell values) | PDF passwords (Phase 4: used in memory only) |
+| Merchant rules (your corrections, which may include a payee's name, stay local) | |
 
 ## What is logged
 
-Only import metadata: id, status and counts. No narrations, amounts or file contents. The SQLAlchemy engine runs with `hide_parameters=True`, so SQL logs and database error messages don't contain values even at DEBUG level. Parser exceptions are replaced by generic messages. `tests/api/test_api.py::test_no_statement_content_in_logs` enforces this.
+Only import and categorization metadata: ids, statuses and counts. No narrations, merchant names, amounts or file contents. The SQLAlchemy engine runs with `hide_parameters=True`, so SQL logs and database error messages don't contain values even at DEBUG level. Parser exceptions are replaced by generic messages. `tests/api/test_api.py::test_no_statement_content_in_logs` enforces this.
 
 ## Repository hygiene
 

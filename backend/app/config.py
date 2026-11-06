@@ -34,6 +34,8 @@ class Settings(BaseSettings):
 
     demo_mode: bool = False
     samples_dir: Path = REPO_ROOT / "samples" / "synthetic"
+    #: Built React app. Served at "/" when present (production/Docker); dev uses Vite on :5173.
+    frontend_dist: Path = REPO_ROOT / "frontend" / "dist"
     log_level: str = "INFO"
 
     @property

@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 
 from app import __version__
 from app.api import accounts, imports, transactions
@@ -28,6 +29,11 @@ def create_app() -> FastAPI:
     @app.get("/api/health", tags=["meta"])
     def health() -> dict[str, object]:
         return {"status": "ok", "version": __version__, "demo_mode": settings.demo_mode}
+
+    # Mounted last so /api/* routes always win. The frontend has no client-side routes,
+    # so plain static serving with index.html is enough.
+    if (settings.frontend_dist / "index.html").is_file():
+        app.mount("/", StaticFiles(directory=settings.frontend_dist, html=True), name="frontend")
 
     return app
 
