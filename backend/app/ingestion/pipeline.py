@@ -1,6 +1,6 @@
 """End-to-end import of one statement file.
 
-    bytes -> detect type -> raw table -> header split -> mapping (LLM or user)
+    bytes -> detect type -> raw table -> header split -> mapping (user, saved, or LLM)
           -> normalize -> validate -> dedupe -> insert -> categorize -> link transfers
 
 The file's bytes live only in memory for the duration of this call. Nothing is written to disk
@@ -10,6 +10,7 @@ and nothing from the file is logged.
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -20,7 +21,7 @@ from app.ingestion import PARSER_VERSION
 from app.ingestion.dedupe import chunked, file_sha256, transaction_hashes
 from app.ingestion.detect import FileType, detect_file_type, ensure_supported
 from app.ingestion.loaders import FileReadError, Table, load_raw_table, split_header
-from app.ingestion.normalize import MappingError, normalize
+from app.ingestion.normalize import MappingError, NormalizeResult, normalize
 from app.ingestion.validate import order_chronologically, validate
 from app.models import Account, Import, ImportStatus, Transaction, TxnType
 from app.models._types import utcnow
@@ -128,43 +129,48 @@ def _run(
 
     imp.columns = [h[:_MAX_HEADER_LABEL] for h in table.header]
 
+    # Mapping sources, in order: the user's, a saved one that worked for this layout before
+    # (free, offline), then the LLM as a last resort.
+    attempt: _Attempt | None = None
     if mapping_override is not None:
-        mapping, imp.mapping_source = mapping_override, "user"
+        attempt = _evaluate(table, mapping_override, "user", account)
     else:
-        try:
-            mapping = llm.infer_schema(build_masked_sample(table.header, table.body))
-            imp.mapping_source = "llm"
-        except LLMError as exc:
-            imp.status = ImportStatus.needs_review
-            imp.mapping = None
-            imp.error_message = f"Automatic column detection failed: {exc}"
-            db.flush()
-            return []
-    imp.mapping = mapping.model_dump(mode="json")
+        saved = find_saved_mapping(db, account.id, imp.columns)
+        if saved is not None:
+            attempt = _evaluate(table, saved, "saved", account)
+        if attempt is None or not attempt.ok:
+            try:
+                inferred = llm.infer_schema(build_masked_sample(table.header, table.body))
+                attempt = _evaluate(table, inferred, "llm", account)
+            except LLMError as exc:
+                if attempt is None:
+                    imp.status = ImportStatus.needs_review
+                    imp.mapping = None
+                    imp.error_message = f"Automatic column detection failed: {exc}"
+                    db.flush()
+                    return []
+                # Keep the saved mapping so the review screen starts from it.
 
-    try:
-        result = normalize(table, mapping)
-    except MappingError as exc:
+    assert attempt is not None
+    mapping = attempt.mapping
+    imp.mapping = mapping.model_dump(mode="json")
+    imp.mapping_source = attempt.source
+    if attempt.error is not None:
         imp.status = ImportStatus.needs_review
-        imp.error_message = str(exc)
+        imp.error_message = attempt.error
         db.flush()
         return []
-
-    report = validate(result)
-    if mapping.currency != account.currency:
-        report.warnings.append(
-            Issue(
-                severity="warning",
-                code="currency_mismatch",
-                message=f"Statement currency {mapping.currency} differs from account currency "
-                f"{account.currency}",
-            )
-        )
+    assert attempt.result is not None and attempt.report is not None
+    result, report = attempt.result, attempt.report
     _apply_report(imp, report)
 
     if not report.ok:
         imp.status = ImportStatus.needs_review
-        imp.error_message = "Validation failed - review the column mapping"
+        imp.error_message = (
+            "The saved layout for these columns didn't fit this file - review the mapping"
+            if attempt.source == "saved"
+            else "Validation failed - review the column mapping"
+        )
         db.flush()
         return []
 
@@ -202,6 +208,73 @@ def _run(
     imp.completed_at = utcnow()
     db.flush()
     return new_rows
+
+
+@dataclass
+class _Attempt:
+    """One mapping applied to the table: either a validation report or a mapping error."""
+
+    mapping: ColumnMapping
+    source: str  # "user" | "saved" | "llm"
+    result: NormalizeResult | None = None
+    report: ValidationReport | None = None
+    error: str | None = None
+
+    @property
+    def ok(self) -> bool:
+        return self.report is not None and self.report.ok
+
+
+def _evaluate(table: Table, mapping: ColumnMapping, source: str, account: Account) -> _Attempt:
+    try:
+        result = normalize(table, mapping)
+    except MappingError as exc:
+        return _Attempt(mapping, source, error=str(exc))
+    report = validate(result)
+    if mapping.currency != account.currency:
+        report.warnings.append(
+            Issue(
+                severity="warning",
+                code="currency_mismatch",
+                message=f"Statement currency {mapping.currency} differs from account currency "
+                f"{account.currency}",
+            )
+        )
+    return _Attempt(mapping, source, result=result, report=report)
+
+
+def _header_key(columns: list[str] | None) -> tuple[str, ...]:
+    return tuple(" ".join(c.lower().split()) for c in (columns or []))
+
+
+#: How many past completed imports to search for a reusable mapping.
+_SAVED_MAPPING_SCAN = 200
+
+
+def find_saved_mapping(db: Session, account_id: int, columns: list[str]) -> ColumnMapping | None:
+    """Mapping from the most recent completed import with the same column headers.
+
+    Prefers the same account. Lets a bank's layout be mapped once (by the user or the LLM)
+    and reused for every later statement with no LLM call. Validation still checks every
+    import, so a layout that changed only subtly can't slip through.
+    """
+    key = _header_key(columns)
+    if not key:
+        return None
+    rows = db.execute(
+        select(Import.account_id, Import.columns, Import.mapping)
+        .where(Import.status == ImportStatus.completed, Import.mapping.is_not(None))
+        .order_by(Import.id.desc())
+        .limit(_SAVED_MAPPING_SCAN)
+    ).all()
+    matches = [r for r in rows if _header_key(r.columns) == key]
+    if not matches:
+        return None
+    best = next((r for r in matches if r.account_id == account_id), matches[0])
+    try:
+        return ColumnMapping.model_validate(best.mapping)
+    except ValueError:
+        return None
 
 
 def _categorize_new(db: Session, llm: LLMClient, rows: list[Transaction]) -> None:

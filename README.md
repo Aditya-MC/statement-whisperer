@@ -85,9 +85,18 @@ Money in from an expense-type merchant counts as a refund. A debit and an equal 
   - Preamble lines (account holder, account number) are never sent.
 - **Stored:** normalized transactions, file hashes, the column mapping, the validation report and merchant rules. **Not stored:** uploaded files (processed in memory), file names, full account numbers (last 4 only), passwords.
 - **Logged:** import and categorization metadata only. SQL parameters are hidden even at DEBUG level.
-- **Offline option:** without an API key, imports go to *needs review* where you map columns yourself, and categorization uses rules only. Demo mode never makes network calls.
+- **Offline option:** see [Using it for free](#using-it-for-free-no-api-key). Demo mode never makes network calls.
 
 Details are in [docs/privacy.md](docs/privacy.md).
+
+## Using it for free (no API key)
+
+The API key is optional. Leave `ANTHROPIC_API_KEY` empty and nothing ever leaves your machine:
+
+- **Layout:** the first statement from a bank stops at the review screen, with columns pre-guessed from the header names. Once it imports successfully, the mapping is **remembered for that column layout**. Every later statement with the same columns, from any of your accounts, imports straight through. Every import is still validated, and if a saved mapping stops fitting, you're sent back to the review screen with it pre-filled.
+- **Categories:** built-in rules and hints handle common brands, ATM withdrawals, salary, interest, refunds, loan EMIs, rent and payments to people. Anything else stays *Uncategorized* until you pick a category once. That becomes a rule for the merchant and is applied to all its other transactions.
+
+With a key, the AI only fills the gaps: new layouts, and merchants no rule covers yet.
 
 ## Setup (Windows / PowerShell)
 

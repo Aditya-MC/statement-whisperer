@@ -4,7 +4,7 @@ This app handles bank statements, so it is built to keep as little as possible a
 
 ## What is sent to the LLM
 
-**Phase 1 (schema inference): one request per new statement layout**, containing:
+**Phase 1 (schema inference): at most one request per new statement layout.** A layout that has imported successfully once is reused from the database, so later statements with the same columns send nothing. Each request contains:
 
 - The table's **header labels**, with any long digit runs masked (`Acct 1234567` becomes `Acct <num>`).
 - **Up to 10 data rows**, masked cell by cell:

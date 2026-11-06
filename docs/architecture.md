@@ -58,6 +58,14 @@ flowchart LR
 
 It is stored on the import together with the header labels. When validation fails, the review UI (Phase 2) shows both so the user can fix the mapping, then calls `POST /api/imports/{id}/retry` with the same file and the corrected mapping. Uploads are never kept, so the file has to be sent again, and it must hash to the same value.
 
+### Where the mapping comes from
+
+1. **User:** a mapping sent with the upload or with `/retry`.
+2. **Saved:** the mapping of the most recent *completed* import with identical column headers, preferring the same account. It is free, offline and already proven on a real statement.
+3. **LLM:** used only when there is no saved mapping, or the saved one fails validation on this file.
+
+`imports.mapping_source` records which one was used (`user`, `saved`, `llm`). Without an API key, a saved mapping that fails validation is still stored on the import, so the review screen starts from it. No extra table is needed, because completed imports already store their headers and mapping.
+
 ### Import statuses
 
 | Status | Meaning |
@@ -132,7 +140,7 @@ erDiagram
 ```
 
 - **accounts**: bank name, nickname, currency, and `last4` only (a DB check constraint enforces 4 characters).
-- **imports**: file hash, file type, status, parser version, mapping and its source (`llm` or `user`), header labels, validation report, date range, opening/closing balance, counts.
+- **imports**: file hash, file type, status, parser version, mapping and its source (`user`, `saved` or `llm`), header labels, validation report, date range, opening/closing balance, counts.
 - **transactions**: date, signed amount (negative = money out), type, balance, currency, `raw_narration` (immutable), `row_index`, `dedupe_hash` (unique), categorization fields (`cleaned_merchant` (indexed), `category_id`, `category_source`, `rules_version`), and transfer fields (`is_transfer`, `transfer_peer_id`, `transfer_dismissed`).
 - **categories**: a fixed two-level tree seeded by migration `0002`.
 - **merchant_rules**: pattern → category, with `source` of `seed` (migration `0003`), `user` (corrections) or `llm` (cached answers) and a `priority`.

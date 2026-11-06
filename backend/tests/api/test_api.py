@@ -231,3 +231,63 @@ def test_no_statement_content_in_logs(
     for _, desc, amt in LEDGER:
         assert desc not in text
         assert amt not in text
+
+
+def iso_statement() -> bytes:
+    """Same columns as `statement()` but ISO dates, so the saved dd/mm/yyyy mapping won't fit."""
+    lines = ["Example Bank statement", ",".join(HEADER), "2024-03-01,LATE FEE,-5.00,995.00"]
+    return ("\n".join(lines) + "\n").encode()
+
+
+def test_saved_mapping_is_reused_without_llm(
+    client: TestClient, account_id: int, llm_override: dict[str, LLMClient]
+) -> None:
+    llm_override["client"] = UnavailableLLMClient("offline")
+    first = upload(client, account_id, statement(0, 5)).json()
+    assert first["status"] == "needs_review"
+    done = client.post(
+        f"/api/imports/{first['id']}/retry",
+        data={"mapping": MAPPING.model_dump_json()},
+        files={"file": ("s.csv", statement(0, 5), "text/csv")},
+    ).json()
+    assert done["status"] == "completed"
+
+    # Next month's statement from the same bank: imported straight through, no LLM needed.
+    second = upload(client, account_id, statement(5, 9)).json()
+    assert second["status"] == "completed"
+    assert second["mapping_source"] == "saved"
+    assert second["inserted_count"] == 4
+
+
+def test_saved_mapping_works_across_accounts_with_same_layout(
+    client: TestClient, account_id: int, llm_override: dict[str, LLMClient]
+) -> None:
+    upload(client, account_id, statement(0, 5), mapping=MAPPING.model_dump_json())
+    llm_override["client"] = UnavailableLLMClient("offline")
+    other = client.post(
+        "/api/accounts", json={"bank_name": "Example", "nickname": "Joint", "currency": "USD"}
+    ).json()["id"]
+    r = upload(client, other, statement(0, 5)).json()
+    assert r["status"] == "completed" and r["mapping_source"] == "saved"
+
+
+def test_saved_mapping_that_no_longer_fits_falls_back_to_llm(
+    client: TestClient, account_id: int, fake_llm: FakeLLMClient
+) -> None:
+    upload(client, account_id, statement(0, 5), mapping=MAPPING.model_dump_json())
+    fake_llm.register(HEADER, MAPPING.model_copy(update={"date_format": "%Y-%m-%d"}))
+    r = upload(client, account_id, iso_statement()).json()
+    assert r["status"] == "completed"
+    assert r["mapping_source"] == "llm"
+
+
+def test_saved_mapping_misfit_offline_prefills_review(
+    client: TestClient, account_id: int, llm_override: dict[str, LLMClient]
+) -> None:
+    upload(client, account_id, statement(0, 5), mapping=MAPPING.model_dump_json())
+    llm_override["client"] = UnavailableLLMClient("offline")
+    r = upload(client, account_id, iso_statement()).json()
+    assert r["status"] == "needs_review"
+    assert r["mapping_source"] == "saved"
+    assert r["mapping"]["date_format"] == "%d/%m/%Y"  # review screen starts from it
+    assert "%Y-%m-%d" in r["validation"]["suggestions"]["date_format"]
