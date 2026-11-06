@@ -1,19 +1,24 @@
-import { useCallback, useEffect, useState } from "react";
+import { Suspense, lazy, useCallback, useEffect, useState } from "react";
 import ImportPage from "./components/ImportPage.jsx";
 import RulesPage from "./components/RulesPage.jsx";
-import { Toast } from "./components/ui.jsx";
+import ThemeToggle from "./components/ThemeToggle.jsx";
 import TransactionsPage from "./components/TransactionsPage.jsx";
+import { Toast } from "./components/ui.jsx";
 import { api } from "./lib/api.js";
 
+// Charts (Recharts) are only needed on the dashboard, so that code loads on demand.
+const DashboardPage = lazy(() => import("./components/dashboard/DashboardPage.jsx"));
+
 const TABS = [
-  { id: "import", label: "Import" },
+  { id: "dashboard", label: "Dashboard" },
   { id: "transactions", label: "Transactions" },
+  { id: "import", label: "Import" },
   { id: "rules", label: "Rules" },
 ];
 
 function tabFromHash() {
   const id = window.location.hash.replace("#", "");
-  return TABS.some((t) => t.id === id) ? id : "import";
+  return TABS.some((t) => t.id === id) ? id : "dashboard";
 }
 
 export default function App() {
@@ -28,12 +33,15 @@ export default function App() {
     window.addEventListener("hashchange", onHash);
     return () => window.removeEventListener("hashchange", onHash);
   }, []);
+
   const [accounts, setAccounts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [accountId, setAccountId] = useState(null);
   const [health, setHealth] = useState(null);
   const [loadError, setLoadError] = useState(null);
   const [toast, setToast] = useState(null);
+  // Dashboard drill-down: filters handed to the Transactions page (remounted per drill-down).
+  const [drill, setDrill] = useState(null);
 
   const loadAccounts = useCallback(async (selectId) => {
     const list = await api.listAccounts();
@@ -52,42 +60,75 @@ export default function App() {
 
   const notify = useCallback((message, tone = "info") => setToast({ message, tone, at: Date.now() }), []);
   const closeToast = useCallback(() => setToast(null), []);
+  const openTransactions = useCallback(
+    (filters) => {
+      setDrill({ ...filters, at: Date.now() });
+      setTab("transactions");
+    },
+    [setTab],
+  );
 
   return (
     <div className="min-h-screen">
-      <header className="border-b border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3">
-          <h1 className="text-lg font-semibold tracking-tight">Statement Whisperer</h1>
+      <header className="sticky top-0 z-40 border-b border-line bg-page/90 backdrop-blur">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-8 gap-y-2 px-4 py-3">
+          <h1 className="text-[15px] font-semibold tracking-tight">Statement Whisperer</h1>
           <nav className="flex gap-1" aria-label="Sections">
             {TABS.map((t) => (
               <button
                 key={t.id}
                 type="button"
-                onClick={() => setTab(t.id)}
+                onClick={() => {
+                  if (t.id === "transactions") setDrill(null);
+                  setTab(t.id);
+                }}
                 aria-current={tab === t.id ? "page" : undefined}
-                className={`rounded-md px-3 py-1.5 text-sm font-medium ${
-                  tab === t.id
-                    ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
-                    : "text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                className={`rounded-md px-2.5 py-1 text-sm transition-colors ${
+                  tab === t.id ? "bg-surface-2 font-medium text-ink" : "text-muted hover:text-ink"
                 }`}
               >
                 {t.label}
               </button>
             ))}
           </nav>
-          {health?.demo_mode && (
-            <span className="ml-auto rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
-              Demo mode · synthetic data
-            </span>
-          )}
+          <div className="ml-auto flex items-center gap-3">
+            {health?.demo_mode && (
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-line px-2.5 py-0.5 text-xs text-ink-2">
+                <span aria-hidden="true" className="size-2 rounded-full bg-[#fab219]" />
+                Demo · synthetic data
+              </span>
+            )}
+            <ThemeToggle />
+          </div>
         </div>
       </header>
 
-      <main className="mx-auto max-w-6xl px-4 py-6">
+      <main className="mx-auto max-w-6xl px-4 py-8">
         {loadError && (
-          <div className="card mb-4 border-red-300 text-sm text-red-700 dark:border-red-900 dark:text-red-300">
+          <div className="card mb-4 border-critical text-sm text-critical">
             Could not reach the API: {loadError}. Is the backend running on port 8000?
           </div>
+        )}
+        {tab === "dashboard" && (
+          <Suspense fallback={<p className="text-sm text-muted">Loading…</p>}>
+            <DashboardPage
+              accounts={accounts}
+              categories={categories}
+              onDrill={openTransactions}
+              onImport={() => setTab("import")}
+              notify={notify}
+            />
+          </Suspense>
+        )}
+        {tab === "transactions" && (
+          <TransactionsPage
+            key={drill?.at ?? "plain"}
+            accounts={accounts}
+            categories={categories}
+            initialAccountId={accountId}
+            preset={drill}
+            notify={notify}
+          />
         )}
         {tab === "import" && (
           <ImportPage
@@ -98,9 +139,6 @@ export default function App() {
             onViewTransactions={() => setTab("transactions")}
             notify={notify}
           />
-        )}
-        {tab === "transactions" && (
-          <TransactionsPage accounts={accounts} categories={categories} initialAccountId={accountId} notify={notify} />
         )}
         {tab === "rules" && <RulesPage categories={categories} notify={notify} />}
       </main>

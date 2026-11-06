@@ -10,7 +10,6 @@ const PAGE_SIZE = 50;
 // Server-side filtering and paging: the table only renders the current page.
 const features = tableFeatures({});
 const helper = createColumnHelper();
-const SOURCE_TONES = { user: "emerald", rule: "sky", cache: "zinc", llm: "violet" };
 
 function useDebounced(value, ms = 300) {
   const [v, setV] = useState(value);
@@ -21,16 +20,22 @@ function useDebounced(value, ms = 300) {
   return v;
 }
 
-export default function TransactionsPage({ accounts, categories, initialAccountId, notify }) {
+/**
+ * `preset` comes from a dashboard drill-down ({category_id, date_from, date_to, q, uncategorized,
+ * account_id}). The parent remounts this page (via `key`) for each new drill-down.
+ */
+export default function TransactionsPage({ accounts, categories, initialAccountId, preset, notify }) {
   const groups = useMemo(() => groupCategories(categories), [categories]);
   const accountsById = useMemo(() => new Map(accounts.map((a) => [a.id, a])), [accounts]);
-  const [filters, setFilters] = useState({
-    account_id: initialAccountId ?? null,
-    category_id: null,
-    uncategorized: false,
+  const [filters, setFilters] = useState(() => ({
+    account_id: preset?.account_id !== undefined ? preset.account_id : (initialAccountId ?? null),
+    category_id: preset?.category_id ?? null,
+    uncategorized: preset?.uncategorized ?? false,
     transfers: "all",
-  });
-  const [search, setSearch] = useState("");
+    date_from: preset?.date_from ?? null,
+    date_to: preset?.date_to ?? null,
+  }));
+  const [search, setSearch] = useState(preset?.q ?? "");
   const q = useDebounced(search);
   const [offset, setOffset] = useState(0);
   const [page, setPage] = useState({ total: 0, items: [] });
@@ -51,6 +56,8 @@ export default function TransactionsPage({ accounts, categories, initialAccountI
         category_id: filters.category_id,
         uncategorized: filters.uncategorized,
         is_transfer: filters.transfers === "all" ? undefined : filters.transfers === "only",
+        date_from: filters.date_from,
+        date_to: filters.date_to,
         q,
         limit: PAGE_SIZE,
         offset,
@@ -138,11 +145,11 @@ export default function TransactionsPage({ accounts, categories, initialAccountI
             return (
               <div className="min-w-0">
                 <div className="truncate font-medium">{t.cleaned_merchant ?? "—"}</div>
-                <div className="truncate text-xs text-zinc-500" title={t.raw_narration}>
+                <div className="truncate text-xs text-muted" title={t.raw_narration}>
                   {t.raw_narration}
                 </div>
                 {showAccount && (
-                  <div className="text-xs text-zinc-400">{accountsById.get(t.account_id)?.nickname}</div>
+                  <div className="text-xs text-muted">{accountsById.get(t.account_id)?.nickname}</div>
                 )}
               </div>
             );
@@ -172,16 +179,16 @@ export default function TransactionsPage({ accounts, categories, initialAccountI
                 />
                 <div className="flex flex-wrap items-center gap-1">
                   {t.category_source && (
-                    <Badge tone={SOURCE_TONES[t.category_source]} title="How this category was chosen">
+                    <Badge title="How this category was chosen">
                       {SOURCE_LABELS[t.category_source]}
                     </Badge>
                   )}
                   {t.is_transfer && (
                     <>
-                      <Badge tone="amber" title="Matched with an opposite transaction in another of your accounts">
+                      <Badge title="Matched with an opposite transaction in another of your accounts">
                         Own transfer
                       </Badge>
-                      <button type="button" className="text-[11px] text-zinc-500 underline" onClick={() => unlinkTransfer(t)}>
+                      <button type="button" className="text-[11px] text-muted underline" onClick={() => unlinkTransfer(t)}>
                         not a transfer?
                       </button>
                     </>
@@ -246,6 +253,22 @@ export default function TransactionsPage({ accounts, categories, initialAccountI
           <input type="checkbox" checked={filters.uncategorized} onChange={(e) => setFilter("uncategorized")(e.target.checked)} />
           Uncategorized only
         </label>
+        {(filters.date_from || filters.date_to) && (
+          <span className="mb-1 inline-flex items-center gap-2 rounded-full border border-line px-2.5 py-1 text-xs text-ink-2">
+            {filters.date_from ? formatDate(filters.date_from) : "Start"} – {filters.date_to ? formatDate(filters.date_to) : "today"}
+            <button
+              type="button"
+              aria-label="Clear date range"
+              className="text-muted hover:text-ink"
+              onClick={() => {
+                setFilters((f) => ({ ...f, date_from: null, date_to: null }));
+                setOffset(0);
+              }}
+            >
+              ✕
+            </button>
+          </span>
+        )}
         <button type="button" className="btn-ghost ml-auto" onClick={recategorize} disabled={busy}>
           {busy ? "Categorizing…" : "Categorize uncategorized"}
         </button>
@@ -259,7 +282,7 @@ export default function TransactionsPage({ accounts, categories, initialAccountI
             <col className="w-36" />
             <col className="w-64" />
           </colgroup>
-          <thead className="border-b border-zinc-200 text-left text-xs uppercase tracking-wide text-zinc-500 dark:border-zinc-800">
+          <thead className="border-b border-line text-left text-xs uppercase tracking-wide text-muted">
             {table.getHeaderGroups().map((group) => (
               <tr key={group.id}>
                 {group.headers.map((header) => (
@@ -272,7 +295,7 @@ export default function TransactionsPage({ accounts, categories, initialAccountI
           </thead>
           <tbody>
             {table.getRowModel().rows.map((row) => (
-              <tr key={row.id} className="border-b border-zinc-100 align-top last:border-0 dark:border-zinc-800">
+              <tr key={row.id} className="border-b border-line align-top last:border-0">
                 {row.getAllCells().map((cell) => (
                   <td key={cell.id} className="px-4 py-2.5">
                     <table.FlexRender cell={cell} />
@@ -282,7 +305,7 @@ export default function TransactionsPage({ accounts, categories, initialAccountI
             ))}
             {!loading && page.items.length === 0 && (
               <tr>
-                <td colSpan={4} className="px-4 py-10 text-center text-zinc-500">
+                <td colSpan={4} className="px-4 py-10 text-center text-muted">
                   No transactions match these filters.
                 </td>
               </tr>
@@ -291,7 +314,7 @@ export default function TransactionsPage({ accounts, categories, initialAccountI
         </table>
       </section>
 
-      <div className="flex items-center justify-between text-sm text-zinc-600 dark:text-zinc-400">
+      <div className="flex items-center justify-between text-sm text-ink-2">
         <span>
           {page.total} transaction{page.total === 1 ? "" : "s"}
           {loading && " · loading…"}

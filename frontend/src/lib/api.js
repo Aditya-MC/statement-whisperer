@@ -77,6 +77,7 @@ export function createApi(fetchImpl = (...a) => fetch(...a)) {
     updateTransaction: (id, body) => call(`/transactions/${id}`, { method: "PATCH", json: body }),
     recategorize: (body = {}) => call("/categorize", { method: "POST", json: body }),
     listRules: (source) => call("/merchant-rules", { params: { source } }),
+    dashboard: (params) => call("/analytics/dashboard", { params }),
     deleteRule: (id) => call(`/merchant-rules/${id}`, { method: "DELETE" }),
   };
 }
