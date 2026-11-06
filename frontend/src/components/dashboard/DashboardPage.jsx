@@ -4,6 +4,7 @@ import { categoryLabels } from "../../lib/categories.js";
 import { PRESETS, formatPercent, presetRange } from "../../lib/dashboard.js";
 import { formatDate, formatMoney } from "../../lib/format.js";
 import CategoryChart from "./CategoryChart.jsx";
+import CategoryPie from "./CategoryPie.jsx";
 import IncomeSpendingChart from "./IncomeSpendingChart.jsx";
 
 function StatTile({ label, value, tone, hint }) {
@@ -244,11 +245,14 @@ export default function DashboardPage({ accounts, categories, onDrill, onImport,
         <IncomeSpendingChart series={data.series} currency={cur} granularity={data.period.granularity} />
 
         <div className="grid gap-6 lg:grid-cols-2">
+          <CategoryPie slices={data.pie} total={s.money_out} currency={cur} onDrill={drill} />
           <CategoryChart rows={data.by_category} refunds={s.refunds} currency={cur} onDrill={drill} />
-          <TopMerchants rows={data.top_merchants} currency={cur} labels={labels} onDrill={drill} />
         </div>
 
-        <Recurring rows={data.recurring} currency={cur} labels={labels} />
+        <div className="grid gap-6 lg:grid-cols-2">
+          <TopMerchants rows={data.top_merchants} currency={cur} labels={labels} onDrill={drill} />
+          <Recurring rows={data.recurring} currency={cur} labels={labels} />
+        </div>
       </div>
     </div>
   );

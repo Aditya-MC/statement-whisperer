@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import statistics
 from collections import defaultdict
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date, timedelta
 from decimal import Decimal
@@ -175,6 +176,70 @@ def _detect_recurring(rows: list[_Row], as_of: date) -> list[dict[str, object]]:
     return found
 
 
+#: Part-to-whole charts stay readable up to ~6 parts: 5 colored groups + a gray "Other".
+PIE_SLOTS = 5
+
+
+def _pie(
+    db: Session,
+    counted: list[_Row],
+    by_group: dict[int | None, _Tally],
+    money_out: Decimal,
+    currency: str | None,
+    group_of: Callable[[int | None], Category | None],
+) -> list[dict[str, object]]:
+    """Spending share per category group for the pie chart.
+
+    Colors must follow the category, not its rank in the current view: a group's color slot
+    is its rank by *all-time* spending (all accounts, this currency). Changing the date or
+    account filter therefore never repaints a slice. Groups outside the top slots, and
+    uncategorized spending, fold into one gray "Other" slice.
+    """
+    if not money_out:
+        return []
+    all_time = _load_rows(db, None, None, None)
+    totals: dict[int, Decimal] = defaultdict(lambda: ZERO)
+    for r in all_time:
+        if r.currency == currency and r.amount < 0 and not r.excluded:
+            g = group_of(r.category_id)
+            if g is not None:
+                totals[g.id] += -r.amount
+    slot_of = {
+        gid: i
+        for i, (gid, _) in enumerate(sorted(totals.items(), key=lambda kv: -kv[1])[:PIE_SLOTS])
+    }
+
+    slices: list[dict[str, object]] = []
+    other = _Tally()
+    for gid, tally in sorted(by_group.items(), key=lambda kv: kv[1].amount, reverse=True):
+        if gid is not None and gid in slot_of:
+            group = group_of(gid)
+            name = group.name if group is not None else str(gid)
+            slices.append(
+                {
+                    "category_id": gid,
+                    "name": name,
+                    "amount": _money(tally.amount),
+                    "share": float(tally.amount / money_out),
+                    "slot": slot_of[gid],
+                }
+            )
+        else:
+            other.amount += tally.amount
+            other.count += tally.count
+    if other.amount:
+        slices.append(
+            {
+                "category_id": None,
+                "name": "Other",
+                "amount": _money(other.amount),
+                "share": float(other.amount / money_out),
+                "slot": None,
+            }
+        )
+    return slices
+
+
 def dashboard(
     db: Session,
     *,
@@ -298,6 +363,8 @@ def dashboard(
     ]
     recurring = _detect_recurring(history, as_of)
 
+    pie = _pie(db, counted, by_group, money_out, chosen, group_of)
+
     uncategorized = [r for r in counted if r.amount < 0 and r.category_id is None]
     return {
         "currency": chosen,
@@ -322,6 +389,7 @@ def dashboard(
         },
         "series": series,
         "by_category": by_category,
+        "pie": pie,
         "top_merchants": top_merchants,
         "recurring": recurring,
     }

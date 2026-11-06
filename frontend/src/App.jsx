@@ -13,11 +13,12 @@ const TABS = [
   { id: "dashboard", label: "Dashboard" },
   { id: "transactions", label: "Transactions" },
   { id: "import", label: "Import" },
-  { id: "rules", label: "Rules" },
+  { id: "categories", label: "Categories" },
 ];
 
 function tabFromHash() {
   const id = window.location.hash.replace("#", "");
+  if (id === "rules") return "categories"; // old bookmark
   return TABS.some((t) => t.id === id) ? id : "dashboard";
 }
 
@@ -58,6 +59,7 @@ export default function App() {
       .catch((e) => setLoadError(e.message));
   }, [loadAccounts]);
 
+  const reloadCategories = useCallback(async () => setCategories(await api.listCategories()), []);
   const notify = useCallback((message, tone = "info") => setToast({ message, tone, at: Date.now() }), []);
   const closeToast = useCallback(() => setToast(null), []);
   const openTransactions = useCallback(
@@ -128,6 +130,7 @@ export default function App() {
             initialAccountId={accountId}
             preset={drill}
             notify={notify}
+            onCategoriesChanged={reloadCategories}
           />
         )}
         {tab === "import" && (
@@ -140,7 +143,9 @@ export default function App() {
             notify={notify}
           />
         )}
-        {tab === "rules" && <RulesPage categories={categories} notify={notify} />}
+        {tab === "categories" && (
+          <RulesPage categories={categories} notify={notify} onCategoriesChanged={reloadCategories} />
+        )}
       </main>
 
       {toast && <Toast key={toast.at} message={toast.message} tone={toast.tone} onClose={closeToast} />}

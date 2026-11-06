@@ -150,6 +150,40 @@ class CategoryOut(BaseModel):
     name: str
     parent_id: int | None
     kind: CategoryKind
+    is_custom: bool
+
+
+def _clean_category_name(v: str) -> str:
+    v = " ".join(v.split())
+    if not v:
+        raise ValueError("name is required")
+    # Both are path separators: ">" in API/LLM paths, the angle quote in UI labels.
+    if any(ch in v for ch in ">›"):  # noqa: RUF001
+        raise ValueError("name can't contain '>' or '›' (used to separate group and category)")  # noqa: RUF001
+    return v
+
+
+class CategoryCreate(BaseModel):
+    name: str = Field(max_length=60)
+    parent_id: int | None = Field(
+        default=None, description="Existing top-level group; omit to create a new group."
+    )
+    kind: CategoryKind = Field(
+        default=CategoryKind.expense, description="Only used for new groups; children inherit."
+    )
+
+    _name = field_validator("name")(_clean_category_name)
+
+
+class CategoryRename(BaseModel):
+    name: str = Field(max_length=60)
+
+    _name = field_validator("name")(_clean_category_name)
+
+
+class CategoryDeleteOut(BaseModel):
+    transactions_uncategorized: int
+    rules_removed: int
 
 
 class ErrorOut(BaseModel):

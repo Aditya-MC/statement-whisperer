@@ -212,3 +212,38 @@ def test_api_endpoint(client: TestClient) -> None:
         "/api/analytics/dashboard", params={"date_from": "2026-10-31", "date_to": "2026-10-01"}
     )
     assert bad.status_code == 422
+
+
+def test_pie_top_groups_plus_other(db: Session, imp: Import) -> None:
+    spend = {
+        "Housing > Rent": 600,
+        "Food > Groceries": 300,
+        "Transport > Fuel": 200,
+        "Bills > Subscriptions": 100,
+        "Health > Medical": 50,
+        "Leisure > Travel": 30,
+    }
+    for path, amount in spend.items():
+        add(db, imp, D, f"-{amount}.00", category=path)
+    add(db, imp, D, "-20.00")  # uncategorized
+    pie = dashboard(db)["pie"]
+    assert [(p["name"], p["slot"]) for p in pie] == [
+        ("Housing", 0), ("Food", 1), ("Transport", 2), ("Bills", 3), ("Health", 4), ("Other", None)
+    ]  # fmt: skip
+    assert pie[-1]["amount"] == "50.00"  # Leisure + uncategorized
+    assert sum(p["share"] for p in pie) == pytest.approx(1.0)
+
+
+def test_pie_colors_follow_the_category_not_the_period(db: Session, imp: Import) -> None:
+    """Slot = all-time rank, so narrowing the date range never repaints a slice."""
+    add(db, imp, date(2026, 9, 1), "-1000.00", category="Housing > Rent")
+    add(db, imp, date(2026, 10, 1), "-100.00", category="Food > Groceries")
+    add(db, imp, date(2026, 10, 2), "-50.00", category="Transport > Fuel")
+    october = dashboard(db, date_from=date(2026, 10, 1), date_to=date(2026, 10, 31))["pie"]
+    # Food is #1 in October but keeps its all-time slot (Housing holds slot 0).
+    assert [(p["name"], p["slot"]) for p in october] == [("Food", 1), ("Transport", 2)]
+
+
+def test_pie_empty_without_spending(db: Session, imp: Import) -> None:
+    add(db, imp, D, "100.00", category="Income > Salary")
+    assert dashboard(db)["pie"] == []

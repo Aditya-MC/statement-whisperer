@@ -128,6 +128,7 @@ flowchart TD
 | `net` / `savings_rate` | income − spending; net ÷ income (null with no income) |
 | `series` | income and spending per bucket: weekly (Monday start) for ranges up to 45 days, otherwise monthly; empty buckets are filled |
 | `by_category` | money out per top-level category group, ranked; the 9th group onward folds into "Other (n)" (never a 9th chart colour) |
+| `pie` | money-out share per group for the donut: the groups holding colour slots 0–4, plus one grey "Other" (the rest, including uncategorized). **Slot = the group's all-time rank** (all accounts, this currency), never its rank in the current range, so filtering never repaints a slice. Capped at 6 parts so the whole reads at a glance. |
 | `top_merchants` | the 10 largest `cleaned_merchant`s by money out |
 | `recurring` | merchants with 3+ payments whose median gap is weekly (6–8 days) or monthly (25–35 days), with at least 70% of gaps within ±35% of the median and every amount within ±25% of the median amount. It looks back up to 400 days before the range end and drops merchants not seen for 1.5 gaps. |
 
@@ -172,7 +173,9 @@ erDiagram
 - **accounts**: bank name, nickname, currency, and `last4` only (a DB check constraint enforces 4 characters).
 - **imports**: file hash, file type, status, parser version, mapping and its source (`user`, `saved` or `llm`), header labels, validation report, date range, opening/closing balance, counts.
 - **transactions**: date, signed amount (negative = money out), type, balance, currency, `raw_narration` (immutable), `row_index`, `dedupe_hash` (unique), categorization fields (`cleaned_merchant` (indexed), `category_id`, `category_source`, `rules_version`), and transfer fields (`is_transfer`, `transfer_peer_id`, `transfer_dismissed`).
-- **categories**: a fixed two-level tree seeded by migration `0002`.
+- **categories**: a two-level tree. The built-in part is seeded by migration `0002`. Users can add their own (`is_custom`, migration `0005`) under existing groups or as new groups, and the categorizer and LLM list pick them up automatically. Only custom categories can be renamed or deleted, because code refers to built-ins by path (`Income > Refunds`, `Transfers > Self Transfer`…).
+
+**SQLite migrations and foreign keys.** SQLite can't `ALTER` most things, so Alembic's batch mode rebuilds the table (copy, drop, rename). With foreign keys enforced, the `DROP` would fire `ON DELETE CASCADE` / `SET NULL` on every referencing row: adding a column to `categories` would wipe sub-categories, merchant rules and transaction categories. `alembic/env.py` therefore switches enforcement off for the migration, runs `PRAGMA foreign_key_check` before committing, and switches it back on. `test_upgrades_preserve_existing_data` guards this.
 - **merchant_rules**: pattern → category, with `source` of `seed` (migration `0003`), `user` (corrections) or `llm` (cached answers) and a `priority`.
 
 Money is stored as `NUMERIC(18,4)`. SQLite is the default and Postgres works through `DATABASE_URL`. Migrations are hand-written, and `tests/test_migrations.py` checks that they produce exactly the schema the ORM models describe.

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatCompact, formatPercent, presetRange, toChartSeries } from "./dashboard.js";
+import { formatCompact, formatPercent, presetRange, sliceColor, toChartSeries } from "./dashboard.js";
 
 describe("presetRange", () => {
   const today = new Date(2026, 10, 6); // 6 Nov 2026 (months are 0-based)
@@ -42,5 +42,13 @@ describe("formatting", () => {
     expect(toChartSeries([{ label: "Oct", income: "10.50", spending: "2.00" }])).toEqual([
       { label: "Oct", income: 10.5, spending: 2 },
     ]);
+  });
+});
+
+describe("sliceColor", () => {
+  it("maps slots to palette tokens and Other to gray", () => {
+    expect(sliceColor(0)).toBe("var(--series-1)");
+    expect(sliceColor(4)).toBe("var(--series-5)");
+    expect(sliceColor(null)).toBe("var(--series-muted)");
   });
 });
