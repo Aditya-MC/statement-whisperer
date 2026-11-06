@@ -32,7 +32,7 @@ export function formatDate(iso) {
 
 export function amountTone(amount) {
   const n = Number(amount);
-  if (n > 0) return "text-emerald-600 dark:text-emerald-400";
-  if (n < 0) return "text-zinc-900 dark:text-zinc-100";
-  return "text-zinc-500";
+  if (n > 0) return "text-good";
+  if (n < 0) return "text-ink";
+  return "text-muted";
 }

@@ -11,13 +11,15 @@ A personal-finance ledger that works with statements from any bank. Upload a CSV
 
 There is no parser per bank. An LLM looks at a small, masked sample to infer the column layout, plain code applies that layout to every row, and strict validation catches any mistake before data is stored. Categorization works in layers: your own rules come first, then built-in hints and rules, then cached answers, and only unknown merchants go to the LLM.
 
-> **Status:** Phase 2 (categorization and UI) is complete. Next: the dashboard. See the [roadmap](#roadmap).
+> **Status:** Phase 3 (dashboard and light/dark theme) is complete. Next: PDF statements. See the [roadmap](#roadmap).
 
 ## Screenshots
 
-| Transactions with inline category editing | Import |
+| Dashboard (light) | Dashboard (dark) |
 |---|---|
-| ![Transactions](docs/screenshots/transactions.png) | ![Import](docs/screenshots/import.png) |
+| ![Dashboard, light theme](docs/screenshots/dashboard-light.png) | ![Dashboard, dark theme](docs/screenshots/dashboard-dark.png) |
+
+![Transactions with inline category editing](docs/screenshots/transactions.png)
 
 _Demo mode, synthetic data only._
 
@@ -42,7 +44,7 @@ The full pipeline, data model and design notes are in [docs/architecture.md](doc
 
 **Stack:**
 - Backend: FastAPI · SQLAlchemy 2 · Alembic · pandas/openpyxl · Anthropic API (structured output) · pytest
-- Frontend: React 19 · Vite · Tailwind 4 · TanStack Table · Vitest
+- Frontend: React 19 · Vite · Tailwind 4 · TanStack Table · Recharts · Vitest
 
 ## Supported layouts
 
@@ -67,6 +69,23 @@ Each of these is covered by a synthetic statement in [`samples/synthetic/`](samp
 | `jpy_trailing_minus_no_decimals` | CSV | `1,234-` negatives, zero-decimal currency, `05JAN2024` |
 
 Also handled: CSV with no header, CP1252/Latin-1 encodings, repeated header rows, end-of-day-only balances, same-day identical transactions, and overlapping statements.
+
+## Dashboard
+
+One filter row (period, account, currency) scopes everything below it:
+
+- **Spent** (the headline figure), plus **income**, **net saved** and **savings rate**.
+- **Income vs spending:** per week for ranges up to 45 days, per month beyond that.
+- **Spending by category:** ranked, with the top 8 shown and the rest folded into "Other". Click a bar to open its transactions.
+- **Top merchants:** click a row to open its transactions.
+- **Recurring payments:** merchants paid weekly or monthly at a similar amount, with the next expected date and the cost per month.
+
+How the numbers are defined:
+- **Transfers:** money moved between your own accounts is left out of everything. Payments to other people count as spending.
+- **Refunds:** they reduce spending rather than counting as income.
+- **Currencies:** amounts in different currencies are never added together.
+
+Every chart has a **Table** view, so no value is only visible on hover. Chart colours come from a palette checked for colour-blind safety and contrast in both themes. The **Light / Dark / System** switch in the header is remembered per browser.
 
 ## How categorization works
 
@@ -167,6 +186,7 @@ All settings come from environment variables or `.env`. See [`.env.example`](.en
 | `POST` | `/api/categorize` | Re-run categorization and transfer linking (never touches manual categories) |
 | `GET` | `/api/merchant-rules` | List rules (`?source=` `user`, `llm` or `seed`) |
 | `DELETE` | `/api/merchant-rules/{id}` | Delete a rule |
+| `GET` | `/api/analytics/dashboard` | Summary, time series, categories, top merchants, recurring payments (filters: `date_from`, `date_to`, `account_id`, `currency`) |
 
 ## Development
 
@@ -193,6 +213,6 @@ scripts/    dev.ps1 task runner
 
 - [x] **Phase 1:** scaffolding, schema + migrations, CSV/XLSX ingestion with LLM schema inference, validation, dedupe, import API, tests
 - [x] **Phase 2:** layered categorizer (merchant cleanup → rules → cache → LLM), correction loop, own-account transfers, transactions table and mapping review UI, Docker files (untested)
-- [ ] **Phase 3:** dashboard (categories, trends, income vs expense, top merchants, recurring payments, savings rate)
+- [x] **Phase 3:** dashboard (categories, trends, income vs expense, top merchants, recurring payments, savings rate), light/dark theme
 - [ ] **Phase 4:** text PDFs, password-protected PDFs, scanned/image fallback
 - [ ] **Phase 5:** export, automatic backups, year-over-year analytics, anomaly flags

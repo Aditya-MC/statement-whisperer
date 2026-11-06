@@ -61,7 +61,7 @@ export default function ImportPage({ accounts, accountId, setAccountId, onAccoun
           <h2 className="mb-3 text-base font-semibold">Upload a statement</h2>
           {accounts.length === 0 || showNewAccount ? (
             <div className="mb-4">
-              <p className="mb-3 text-sm text-zinc-600 dark:text-zinc-400">
+              <p className="mb-3 text-sm text-ink-2">
                 {accounts.length === 0 ? "Create an account to import into." : "New account"}
               </p>
               <AccountForm
@@ -96,7 +96,7 @@ export default function ImportPage({ accounts, accountId, setAccountId, onAccoun
                 <input
                   type="file"
                   accept=".csv,.tsv,.txt,.xlsx"
-                  className="input file:mr-3 file:rounded file:border-0 file:bg-zinc-100 file:px-2 file:py-1 dark:file:bg-zinc-800"
+                  className="input file:mr-3 file:rounded file:border-0 file:bg-surface-2 file:px-2 file:py-1"
                   onChange={(e) => {
                     setFile(e.target.files?.[0] ?? null);
                     setResult(null);
@@ -114,11 +114,11 @@ export default function ImportPage({ accounts, accountId, setAccountId, onAccoun
               )}
             </form>
           )}
-          <p className="mt-3 text-xs text-zinc-500">
+          <p className="mt-3 text-xs text-muted">
             CSV, TSV or XLSX from any bank. The file is processed in memory and never stored. Only the
             header and up to 10 masked rows are used to detect the layout.
           </p>
-          {error && <p className="mt-3 text-sm text-red-600 dark:text-red-400">{error}</p>}
+          {error && <p className="mt-3 text-sm text-critical">{error}</p>}
         </section>
 
         {result && <ImportResult imp={result} onViewTransactions={onViewTransactions} />}
@@ -130,7 +130,7 @@ export default function ImportPage({ accounts, accountId, setAccountId, onAccoun
       <aside className="card h-fit">
         <h2 className="mb-3 text-sm font-semibold">Recent imports</h2>
         {history.length === 0 ? (
-          <p className="text-sm text-zinc-500">None yet.</p>
+          <p className="text-sm text-muted">None yet.</p>
         ) : (
           <ul className="flex flex-col gap-2 text-sm">
             {history.slice(0, 12).map((h) => (
@@ -141,7 +141,7 @@ export default function ImportPage({ accounts, accountId, setAccountId, onAccoun
                     setResult(h);
                     setResultFile(null);
                   }}
-                  className="flex w-full items-center justify-between gap-2 rounded px-1 py-0.5 text-left hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                  className="flex w-full items-center justify-between gap-2 rounded px-1 py-0.5 text-left hover:bg-surface-2"
                 >
                   <span className="truncate">
                     #{h.id} {h.date_from ? `${formatDate(h.date_from)} – ${formatDate(h.date_to)}` : h.file_type}

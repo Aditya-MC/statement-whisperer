@@ -9,7 +9,6 @@ const SOURCES = [
   { value: "llm", label: "Learned from AI" },
   { value: "seed", label: "Built-in" },
 ];
-const TONES = { user: "emerald", llm: "violet", seed: "zinc" };
 
 export default function RulesPage({ categories, notify }) {
   const labels = useMemo(() => categoryLabels(categories), [categories]);
@@ -42,24 +41,24 @@ export default function RulesPage({ categories, notify }) {
             </option>
           ))}
         </select>
-        <p className="w-full text-sm text-zinc-600 dark:text-zinc-400">
+        <p className="w-full text-sm text-ink-2">
           A rule matches when its words appear in the cleaned merchant name. Your corrections always win, then
           built-in hints and rules, then answers remembered from the AI.
         </p>
       </div>
       {rules.length === 0 ? (
-        <p className="text-sm text-zinc-500">
+        <p className="text-sm text-muted">
           No rules here yet. Change a category on the Transactions tab to create one.
         </p>
       ) : (
-        <ul className="divide-y divide-zinc-100 text-sm dark:divide-zinc-800">
+        <ul className="divide-y divide-line text-sm">
           {rules.map((r) => (
             <li key={r.id} className="flex items-center gap-3 py-2">
               <span className="font-mono">{r.pattern}</span>
-              <span className="text-zinc-400">→</span>
+              <span className="text-muted">→</span>
               <span>{labels.get(r.category_id) ?? `#${r.category_id}`}</span>
-              <Badge tone={TONES[r.source]}>{r.source}</Badge>
-              <button type="button" className="ml-auto text-xs text-zinc-500 hover:text-red-600" onClick={() => remove(r)}>
+              <Badge>{r.source}</Badge>
+              <button type="button" className="ml-auto text-xs text-muted hover:text-critical" onClick={() => remove(r)}>
                 Remove
               </button>
             </li>

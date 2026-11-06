@@ -1,35 +1,90 @@
 @import "tailwindcss";
 
-@theme {
-  --font-sans: ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif;
-  --font-mono: ui-monospace, "Cascadia Mono", Consolas, monospace;
+/* `dark:` follows the .dark class on <html> (set by the theme switch), not only the OS. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
+ * Design tokens. Minimal and sharp: near-neutral surfaces, hairline borders, one ink.
+ * Chart colors are the validated reference palette (blue/orange pass the colorblind and
+ * contrast checks in both modes). Dark values are their own steps, not an inversion.
+ */
+:root {
+  color-scheme: light;
+  --page: #f6f6f4;
+  --surface: #fcfcfb;
+  --surface-2: #f0efec;
+  --ink: #0b0b0b;
+  --ink-2: #52514e;
+  --muted: #6b6a65;
+  --line: #e1e0d9;
+  --axis: #c3c2b7;
+  --axis-text: #898781;
+  --good: #006300;
+  --critical: #c42f2f;
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-muted: #c3c2b7;
 }
 
-:root {
-  color-scheme: light dark;
+.dark {
+  color-scheme: dark;
+  --page: #0d0d0d;
+  --surface: #1a1a19;
+  --surface-2: #262624;
+  --ink: #f0efec;
+  --ink-2: #c3c2b7;
+  --muted: #a3a29a;
+  --line: #2c2c2a;
+  --axis: #383835;
+  --axis-text: #898781;
+  --good: #0ca30c;
+  --critical: #e66767;
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-muted: #4a4a46;
+}
+
+@theme inline {
+  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  --color-page: var(--page);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-good: var(--good);
+  --color-critical: var(--critical);
+  --color-series-1: var(--series-1);
+  --color-series-2: var(--series-2);
 }
 
 body {
-  @apply bg-zinc-50 text-zinc-900 antialiased dark:bg-zinc-950 dark:text-zinc-100;
+  @apply bg-page text-ink antialiased;
 }
 
 /* Shared component styles (Tailwind v4 custom utilities, usable with @apply and in markup). */
 @utility input {
-  @apply rounded-md border border-zinc-300 bg-white px-2.5 py-1.5 text-sm shadow-sm focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30 focus:outline-none disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-900;
+  @apply rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-ink outline-none transition-colors placeholder:text-muted focus:border-ink focus:ring-1 focus:ring-ink disabled:opacity-50;
 }
 
 @utility btn {
-  @apply inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50;
+  @apply inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-series-1 disabled:cursor-not-allowed disabled:opacity-50;
 }
 
 @utility btn-primary {
-  @apply btn bg-emerald-600 text-white hover:bg-emerald-700;
+  @apply btn bg-ink text-page hover:opacity-85;
 }
 
 @utility btn-ghost {
-  @apply btn border border-zinc-300 hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800;
+  @apply btn border border-line text-ink hover:bg-surface-2;
 }
 
 @utility card {
-  @apply rounded-lg border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900;
+  @apply rounded-lg border border-line bg-surface p-5;
+}
+
+@utility eyebrow {
+  @apply text-xs font-medium tracking-wide text-muted uppercase;
 }

@@ -37,7 +37,7 @@ export default function AccountForm({ onCreated, onCancel }) {
       <Field label="Last 4 digits" hint="Optional. Never the full number.">
         <input className="input" inputMode="numeric" pattern="\d{4}" maxLength={4} value={form.last4} onChange={set("last4")} />
       </Field>
-      {error && <p className="text-sm text-red-600 sm:col-span-4">{error}</p>}
+      {error && <p className="text-sm text-critical sm:col-span-4">{error}</p>}
       <div className="flex gap-2 sm:col-span-4">
         <button className="btn-primary" disabled={busy}>Create account</button>
         {onCancel && (
