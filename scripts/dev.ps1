@@ -97,15 +97,20 @@ switch ($Task) {
     }
     'demo' {
         # Synthetic data only, separate demo.db, offline fake LLM. Never touches ledger.db.
+        # The env vars are restored afterwards so this terminal doesn't stay pointed at demo.db.
         Assert-Venv
         Push-Location $Backend
+        $savedUrl, $savedDemo = $env:DATABASE_URL, $env:DEMO_MODE
         try {
             & $Py -m app.demo --reset
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
             $env:DATABASE_URL = 'sqlite:///' + ((Join-Path $Backend 'demo.db') -replace '\\', '/')
             $env:DEMO_MODE = 'true'
             & $Py -m uvicorn app.main:app --host 127.0.0.1 --port 8000
-        } finally { Pop-Location }
+        } finally {
+            $env:DATABASE_URL, $env:DEMO_MODE = $savedUrl, $savedDemo
+            Pop-Location
+        }
     }
     'web' {
         Push-Location $Frontend

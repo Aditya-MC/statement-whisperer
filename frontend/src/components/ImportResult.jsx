@@ -1,6 +1,12 @@
 import { formatDate, formatMoney } from "../lib/format.js";
 import { StatusPill } from "./ui.jsx";
 
+const MAPPING_SOURCE_TEXT = {
+  llm: "layout detected by AI",
+  user: "layout set by you",
+  saved: "reused the saved layout for these columns",
+};
+
 function Stat({ label, value }) {
   return (
     <div>
@@ -43,7 +49,7 @@ export default function ImportResult({ imp, onViewTransactions }) {
       <div className="mb-3 flex flex-wrap items-center gap-3">
         <h2 className="text-base font-semibold">Import #{imp.id}</h2>
         <StatusPill status={imp.status} />
-        {imp.mapping_source && <span className="text-xs text-zinc-500">layout detected by {imp.mapping_source === "llm" ? "AI" : "you"}</span>}
+        {imp.mapping_source && <span className="text-xs text-zinc-500">{MAPPING_SOURCE_TEXT[imp.mapping_source] ?? ""}</span>}
         {imp.status === "completed" && (
           <button type="button" className="btn-ghost ml-auto" onClick={onViewTransactions}>
             View transactions →
