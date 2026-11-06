@@ -24,8 +24,8 @@ describe("formatDate", () => {
 
 describe("amountTone", () => {
   it("highlights money in", () => {
-    expect(amountTone("5")).toContain("emerald");
-    expect(amountTone("-5")).not.toContain("emerald");
+    expect(amountTone("5")).toBe("text-good");
+    expect(amountTone("-5")).toBe("text-ink");
   });
 });
 

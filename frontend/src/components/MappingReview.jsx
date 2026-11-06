@@ -68,7 +68,7 @@ export default function MappingReview({ imp, file, accountCurrency, onResolved }
   return (
     <section className="card">
       <h2 className="text-base font-semibold">Review column mapping</h2>
-      <p className="mb-4 text-sm text-zinc-600 dark:text-zinc-400">
+      <p className="mb-4 text-sm text-ink-2">
         Tell us which column holds what. Nothing is saved until the statement passes validation.
       </p>
       <form onSubmit={submit} className="flex flex-col gap-5">
@@ -87,9 +87,7 @@ export default function MappingReview({ imp, file, accountCurrency, onResolved }
               <label
                 key={i}
                 className={`cursor-pointer rounded-md border px-2 py-1 text-sm ${
-                  m.description_columns?.includes(i)
-                    ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-900/30"
-                    : "border-zinc-300 dark:border-zinc-700"
+                  m.description_columns?.includes(i) ? "border-ink bg-surface-2" : "border-line"
                 }`}
               >
                 <input type="checkbox" className="sr-only" checked={m.description_columns?.includes(i) ?? false} onChange={() => toggleDescription(i)} />
@@ -174,7 +172,7 @@ export default function MappingReview({ imp, file, accountCurrency, onResolved }
 
         {suggestions.length > 0 && (
           <div className="flex flex-wrap items-center gap-2 text-sm">
-            <span className="text-zinc-600 dark:text-zinc-400">Date formats that fit every row:</span>
+            <span className="text-ink-2">Date formats that fit every row:</span>
             {suggestions.map((f) => (
               <button key={f} type="button" className="btn-ghost font-mono !py-0.5" onClick={() => set("date_format")(f)}>
                 {f}
@@ -194,7 +192,7 @@ export default function MappingReview({ imp, file, accountCurrency, onResolved }
           </Field>
         )}
 
-        {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+        {error && <p className="text-sm text-critical">{error}</p>}
         <div>
           <button className="btn-primary" disabled={busy || Object.keys(errors).length > 0 || !retryFile}>
             {busy ? "Re-running…" : "Re-run import with this mapping"}
