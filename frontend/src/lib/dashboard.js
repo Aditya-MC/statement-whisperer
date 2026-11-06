@@ -66,3 +66,11 @@ export function formatPercent(ratio) {
 export function toChartSeries(series) {
   return series.map((s) => ({ ...s, income: Number(s.income), spending: Number(s.spending) }));
 }
+
+/**
+ * Pie slice color. The slot comes from the API (the group's all-time rank), so a category keeps
+ * its color whatever the filters; null is the gray "Other".
+ */
+export function sliceColor(slot) {
+  return slot === null || slot === undefined ? "var(--series-muted)" : `var(--series-${slot + 1})`;
+}
