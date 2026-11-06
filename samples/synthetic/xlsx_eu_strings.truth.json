@@ -1,0 +1,317 @@
+{
+ "layout": "xlsx_eu_strings",
+ "file": "xlsx_eu_strings.xlsx",
+ "header": [
+  "Datum",
+  "Omschrijving",
+  "Bedrag",
+  "Saldo"
+ ],
+ "mapping": {
+  "date_column": 0,
+  "description_columns": [
+   1
+  ],
+  "amount_mode": "signed",
+  "amount_column": 2,
+  "debit_column": null,
+  "credit_column": null,
+  "type_column": null,
+  "balance_column": 3,
+  "date_format": "%d/%m/%Y",
+  "decimal_separator": ",",
+  "thousands_separator": ".",
+  "currency": "EUR",
+  "sign_convention": "negative_is_debit",
+  "drcr_markers": false
+ },
+ "expected": {
+  "count": 47,
+  "opening_balance": "94894.00",
+  "closing_balance": "114325.09",
+  "transactions": [
+   {
+    "date": "2024-01-03",
+    "amount": "214.35",
+    "balance": "95108.35",
+    "narration": "INT.PD:1063704871:SAVINGS INTEREST"
+   },
+   {
+    "date": "2024-01-03",
+    "amount": "482.46",
+    "balance": "95590.81",
+    "narration": "IMPS-2407773507-JOHN Q PUBLIC-SPLIT"
+   },
+   {
+    "date": "2024-01-04",
+    "amount": "-566.36",
+    "balance": "95024.45",
+    "narration": "ACH DEBIT NETFLIX.COM 7885651241"
+   },
+   {
+    "date": "2024-01-05",
+    "amount": "-8290.58",
+    "balance": "86733.87",
+    "narration": "ATM WDL 8240719966 MG ROAD BRANCH"
+   },
+   {
+    "date": "2024-01-05",
+    "amount": "1165.00",
+    "balance": "87898.87",
+    "narration": "UPI/7929185936/REFUND MEGASTORE/pay.merchant@okexample"
+   },
+   {
+    "date": "2024-01-05",
+    "amount": "-15000.00",
+    "balance": "72898.87",
+    "narration": "IMPS-4857723518-JANE DOE-RENT"
+   },
+   {
+    "date": "2024-01-06",
+    "amount": "1218.20",
+    "balance": "74117.07",
+    "narration": "IMPS-9869082456-JOHN Q PUBLIC-SPLIT"
+   },
+   {
+    "date": "2024-01-07",
+    "amount": "-1095.77",
+    "balance": "73021.30",
+    "narration": "NEFT DR-1158591132-CITY POWER UTILITY"
+   },
+   {
+    "date": "2024-01-09",
+    "amount": "-1225.19",
+    "balance": "71796.11",
+    "narration": "POS XXXX7130 AMAZON MKTPLACE SEATTLE"
+   },
+   {
+    "date": "2024-01-09",
+    "amount": "2025.53",
+    "balance": "73821.64",
+    "narration": "UPI/4467970294/REFUND MEGASTORE/store77@okexample"
+   },
+   {
+    "date": "2024-01-09",
+    "amount": "-459.58",
+    "balance": "73362.06",
+    "narration": "CARD XXXX2957 UBER TRIP HELP.UBER.COM"
+   },
+   {
+    "date": "2024-01-09",
+    "amount": "-250.00",
+    "balance": "73112.06",
+    "narration": "UPI/7777777777/CHAI POINT/jdoe@ybl"
+   },
+   {
+    "date": "2024-01-09",
+    "amount": "-250.00",
+    "balance": "72862.06",
+    "narration": "UPI/7777777777/CHAI POINT/jdoe@ybl"
+   },
+   {
+    "date": "2024-01-09",
+    "amount": "-5561.41",
+    "balance": "67300.65",
+    "narration": "ATM WDL 4339386002 MG ROAD BRANCH"
+   },
+   {
+    "date": "2024-01-09",
+    "amount": "-388.10",
+    "balance": "66912.55",
+    "narration": "UPI/5482541161/SWIGGY/jdoe@okexample/Payment"
+   },
+   {
+    "date": "2024-01-10",
+    "amount": "85000.00",
+    "balance": "151912.55",
+    "narration": "NEFT CR-3503317276-ACME CORP-SALARY"
+   },
+   {
+    "date": "2024-01-13",
+    "amount": "-651.21",
+    "balance": "151261.34",
+    "narration": "CARD XXXX9190 UBER TRIP HELP.UBER.COM"
+   },
+   {
+    "date": "2024-01-16",
+    "amount": "2595.69",
+    "balance": "153857.03",
+    "narration": "UPI/9151797950/REFUND MEGASTORE/store77@okexample"
+   },
+   {
+    "date": "2024-01-17",
+    "amount": "85000.00",
+    "balance": "238857.03",
+    "narration": "NEFT CR-2895570172-ACME CORP-SALARY"
+   },
+   {
+    "date": "2024-01-18",
+    "amount": "-5282.13",
+    "balance": "233574.90",
+    "narration": "POS XXXX2519 AMAZON MKTPLACE SEATTLE"
+   },
+   {
+    "date": "2024-01-19",
+    "amount": "1705.57",
+    "balance": "235280.47",
+    "narration": "IMPS-5893254783-JOHN Q PUBLIC-SPLIT"
+   },
+   {
+    "date": "2024-01-22",
+    "amount": "-682.83",
+    "balance": "234597.64",
+    "narration": "CARD XXXX7935 UBER TRIP HELP.UBER.COM"
+   },
+   {
+    "date": "2024-01-24",
+    "amount": "-549.04",
+    "balance": "234048.60",
+    "narration": "ACH DEBIT NETFLIX.COM 4176735038"
+   },
+   {
+    "date": "2024-01-27",
+    "amount": "664.37",
+    "balance": "234712.97",
+    "narration": "IMPS-6567482487-JOHN Q PUBLIC-SPLIT"
+   },
+   {
+    "date": "2024-01-27",
+    "amount": "-3937.46",
+    "balance": "230775.51",
+    "narration": "POS XXXX8820 SHELL FUEL STATION 22"
+   },
+   {
+    "date": "2024-01-28",
+    "amount": "-15000.00",
+    "balance": "215775.51",
+    "narration": "IMPS-9529187747-JANE DOE-RENT"
+   },
+   {
+    "date": "2024-01-29",
+    "amount": "-15000.00",
+    "balance": "200775.51",
+    "narration": "IMPS-5236012810-JANE DOE-RENT"
+   },
+   {
+    "date": "2024-01-30",
+    "amount": "-15000.00",
+    "balance": "185775.51",
+    "narration": "IMPS-2564766304-JANE DOE-RENT"
+   },
+   {
+    "date": "2024-02-01",
+    "amount": "483.98",
+    "balance": "186259.49",
+    "narration": "INT.PD:9052757710:SAVINGS INTEREST"
+   },
+   {
+    "date": "2024-02-01",
+    "amount": "-993.54",
+    "balance": "185265.95",
+    "narration": "UPI/6789635201/ZEPTO MARKETPLACE/store77@ybl"
+   },
+   {
+    "date": "2024-02-04",
+    "amount": "-748.81",
+    "balance": "184517.14",
+    "narration": "BIL/ONL/9194953568/ACME TELECOM POSTPAID"
+   },
+   {
+    "date": "2024-02-05",
+    "amount": "-564.46",
+    "balance": "183952.68",
+    "narration": "CARD XXXX9844 UBER TRIP HELP.UBER.COM"
+   },
+   {
+    "date": "2024-02-05",
+    "amount": "385.75",
+    "balance": "184338.43",
+    "narration": "INT.PD:9871206182:SAVINGS INTEREST"
+   },
+   {
+    "date": "2024-02-08",
+    "amount": "-5000.00",
+    "balance": "179338.43",
+    "narration": "SIP 9907198837 EXAMPLE MUTUAL FUND"
+   },
+   {
+    "date": "2024-02-09",
+    "amount": "-8476.71",
+    "balance": "170861.72",
+    "narration": "ATM WDL 2034431640 MG ROAD BRANCH"
+   },
+   {
+    "date": "2024-02-09",
+    "amount": "-2407.02",
+    "balance": "168454.70",
+    "narration": "NEFT DR-2810996098-CITY POWER UTILITY"
+   },
+   {
+    "date": "2024-02-09",
+    "amount": "-5000.00",
+    "balance": "163454.70",
+    "narration": "SIP 3466346640 EXAMPLE MUTUAL FUND"
+   },
+   {
+    "date": "2024-02-09",
+    "amount": "-902.41",
+    "balance": "162552.29",
+    "narration": "UPI/9746918949/ZEPTO MARKETPLACE/store77@ybl"
+   },
+   {
+    "date": "2024-02-09",
+    "amount": "-3698.92",
+    "balance": "158853.37",
+    "narration": "POS XXXX3691 SHELL FUEL STATION 22"
+   },
+   {
+    "date": "2024-02-11",
+    "amount": "-1488.44",
+    "balance": "157364.93",
+    "narration": "CHQ PAID 5673813811 JOHN Q PUBLIC"
+   },
+   {
+    "date": "2024-02-11",
+    "amount": "2674.56",
+    "balance": "160039.49",
+    "narration": "UPI/8329316334/REFUND MEGASTORE/pay.merchant@okexample"
+   },
+   {
+    "date": "2024-02-11",
+    "amount": "-4755.65",
+    "balance": "155283.84",
+    "narration": "CHQ PAID 8834745198 JOHN Q PUBLIC"
+   },
+   {
+    "date": "2024-02-12",
+    "amount": "-15000.00",
+    "balance": "140283.84",
+    "narration": "IMPS-5711717860-JANE DOE-RENT"
+   },
+   {
+    "date": "2024-02-15",
+    "amount": "-15000.00",
+    "balance": "125283.84",
+    "narration": "IMPS-7743152360-JANE DOE-RENT"
+   },
+   {
+    "date": "2024-02-15",
+    "amount": "-923.74",
+    "balance": "124360.10",
+    "narration": "UPI/6005754528/ZEPTO MARKETPLACE/jdoe@ybl"
+   },
+   {
+    "date": "2024-02-15",
+    "amount": "-5899.50",
+    "balance": "118460.60",
+    "narration": "CHQ PAID 4590469107 JOHN Q PUBLIC"
+   },
+   {
+    "date": "2024-02-16",
+    "amount": "-4135.51",
+    "balance": "114325.09",
+    "narration": "POS XXXX3667 AMAZON MKTPLACE SEATTLE"
+   }
+  ]
+ }
+}
