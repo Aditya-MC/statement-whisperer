@@ -8,7 +8,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from app import __version__
-from app.api import accounts, imports, transactions
+from app.api import accounts, analytics, imports, transactions
 from app.config import get_settings
 
 
@@ -23,7 +23,7 @@ def create_app() -> FastAPI:
         version=__version__,
         description="Bank-agnostic statement ingestion and personal finance ledger.",
     )
-    for router in (accounts.router, imports.router, transactions.router):
+    for router in (accounts.router, imports.router, transactions.router, analytics.router):
         app.include_router(router, prefix="/api")
 
     @app.get("/api/health", tags=["meta"])
