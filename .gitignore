@@ -1,0 +1,44 @@
+# --- Secrets -------------------------------------------------------------
+.env
+.env.*
+!.env.example
+
+# --- Databases & personal data -------------------------------------------
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+uploads/
+backups/
+data/
+# Real bank statements must never be committed. Put them here.
+samples/real/
+*.real.csv
+*.real.xlsx
+*.real.pdf
+
+# --- Python --------------------------------------------------------------
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# --- Node / frontend -----------------------------------------------------
+node_modules/
+dist/
+.vite/
+coverage/
+
+# --- Editors / OS --------------------------------------------------------
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
