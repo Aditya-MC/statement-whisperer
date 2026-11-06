@@ -3,7 +3,7 @@ from __future__ import annotations
 import enum
 from datetime import datetime
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Integer, String, UniqueConstraint
+from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Integer, String, UniqueConstraint, false
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base
@@ -34,6 +34,9 @@ class Category(Base):
     kind: Mapped[CategoryKind] = mapped_column(
         Enum(CategoryKind, native_enum=False, length=20, name="category_kind")
     )
+    #: Created by the user. Only custom categories can be renamed or deleted: built-in ones are
+    #: referenced by name in code (e.g. "Income > Refunds") and by the seed rules.
+    is_custom: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
 
 
 class MerchantRule(Base):
