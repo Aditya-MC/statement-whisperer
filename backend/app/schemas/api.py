@@ -4,11 +4,11 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from app.models import CategoryKind, CategorySource, ImportStatus, TxnType
+from app.models import CategoryKind, CategorySource, ImportStatus, RuleSource, TxnType
 
 
 class AccountCreate(BaseModel):
@@ -87,12 +87,60 @@ class TransactionOut(BaseModel):
     cleaned_merchant: str | None
     category_id: int | None
     category_source: CategorySource | None
+    rules_version: int | None
     is_transfer: bool
+    transfer_peer_id: int | None
+    transfer_dismissed: bool
 
 
 class TransactionPage(BaseModel):
     total: int
     items: list[TransactionOut]
+
+
+class TransactionUpdate(BaseModel):
+    """Manual correction. `category_id` sets the category (and saves a merchant rule);
+    `is_transfer=false` unlinks a detected transfer pair."""
+
+    category_id: int | None = None
+    apply_to_similar: bool = Field(
+        default=True,
+        description="Also apply the category to other non-manual rows with the same merchant.",
+    )
+    is_transfer: Literal[False] | None = None
+
+
+class TransactionUpdateOut(BaseModel):
+    transaction: TransactionOut
+    updated_similar: int
+
+
+class CategorizeRequest(BaseModel):
+    account_id: int | None = None
+    only_uncategorized: bool = Field(
+        default=False,
+        description="Only rows with no category yet. Otherwise every non-manual row is redone.",
+    )
+
+
+class CategorizeOut(BaseModel):
+    processed: int
+    by_source: dict[str, int]
+    llm_merchants: int
+    uncategorized: int
+    llm_error: str | None
+    transfers_linked: int
+
+
+class MerchantRuleOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    pattern: str
+    category_id: int
+    source: RuleSource
+    priority: int
+    created_at: datetime
 
 
 class CategoryOut(BaseModel):
