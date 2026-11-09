@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ApiError, createApi, errorMessage, toQuery } from "./api.js";
+import { ApiError, createApi, errorMessage, setUnauthorizedHandler, toQuery } from "./api.js";
 
 function fakeFetch(status, body) {
   const calls = [];
@@ -76,5 +76,28 @@ describe("createApi", () => {
   it("returns null for 204 responses", async () => {
     const api = createApi(fakeFetch(204));
     expect(await api.deleteRule(3)).toBeNull();
+  });
+});
+
+describe("auth", () => {
+  it("posts credentials as JSON and sends cookies same-origin", async () => {
+    const fetch = fakeFetch(200, { id: 1, email: "me@example.com", is_admin: true });
+    const api = createApi(fetch);
+    await api.login({ email: "me@example.com", password: "pw" });
+    const { url, init } = fetch.calls[0];
+    expect(url).toBe("/api/auth/login");
+    expect(init.credentials).toBe("same-origin");
+    expect(JSON.parse(init.body)).toEqual({ email: "me@example.com", password: "pw" });
+  });
+
+  it("calls the unauthorized handler on 401 for app endpoints, not for auth endpoints", async () => {
+    let calls = 0;
+    setUnauthorizedHandler(() => calls++);
+    const api = createApi(fakeFetch(401, { detail: "Please sign in" }));
+    await expect(api.listAccounts()).rejects.toMatchObject({ status: 401 });
+    expect(calls).toBe(1);
+    await expect(api.me()).rejects.toMatchObject({ status: 401 });
+    expect(calls).toBe(1); // /auth/me 401 just means "not signed in yet"
+    setUnauthorizedHandler(null);
   });
 });

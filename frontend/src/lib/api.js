@@ -36,8 +36,16 @@ export function toQuery(params = {}) {
   return s ? `?${s}` : "";
 }
 
+// Called when a request comes back 401 (session expired or signed out elsewhere), so the app
+// can show the sign-in screen. Auth endpoints themselves are excluded.
+let onUnauthorized = null;
+export function setUnauthorizedHandler(fn) {
+  onUnauthorized = fn;
+}
+
 async function request(path, { method = "GET", json, form, params } = {}, fetchImpl = fetch) {
-  const init = { method, headers: {} };
+  // Same-origin requests send the HttpOnly session cookie automatically.
+  const init = { method, headers: {}, credentials: "same-origin" };
   if (json !== undefined) {
     init.headers["Content-Type"] = "application/json";
     init.body = JSON.stringify(json);
@@ -48,7 +56,10 @@ async function request(path, { method = "GET", json, form, params } = {}, fetchI
   if (res.status === 204) return null;
   const text = await res.text();
   const body = text ? JSON.parse(text) : null;
-  if (!res.ok) throw new ApiError(res.status, errorMessage(body, res.status), body);
+  if (!res.ok) {
+    if (res.status === 401 && onUnauthorized && !path.startsWith("/auth/")) onUnauthorized();
+    throw new ApiError(res.status, errorMessage(body, res.status), body);
+  }
   return body;
 }
 
@@ -64,6 +75,14 @@ export function createApi(fetchImpl = (...a) => fetch(...a)) {
   const call = (path, opts) => request(path, opts, fetchImpl);
   return {
     health: () => call("/health"),
+    authStatus: () => call("/auth/status"),
+    me: () => call("/auth/me"),
+    signup: (body) => call("/auth/signup", { method: "POST", json: body }),
+    login: (body) => call("/auth/login", { method: "POST", json: body }),
+    logout: () => call("/auth/logout", { method: "POST" }),
+    deleteMe: (password) => call("/auth/me", { method: "DELETE", json: { password } }),
+    createInvite: (note) => call("/admin/invites", { method: "POST", json: { note: note || null } }),
+    listInvites: () => call("/admin/invites"),
     listAccounts: () => call("/accounts"),
     createAccount: (body) => call("/accounts", { method: "POST", json: body }),
     listCategories: () => call("/categories"),
