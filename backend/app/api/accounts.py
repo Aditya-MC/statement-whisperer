@@ -1,11 +1,19 @@
+"""Bank accounts and the category tree, scoped to the signed-in user.
+
+Everything here only ever reads or changes the current user's own rows. Built-in categories
+are shared and read-only. Someone else's row is reported as "not found" rather than
+"forbidden", so ids can't be probed.
+"""
+
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import delete, func, select, update
+from sqlalchemy import delete, func, or_, select, update
 from sqlalchemy.orm import Session
 
+from app.api.deps import current_user, user_account_ids
 from app.db import get_db
-from app.models import Account, Category, MerchantRule, Transaction
+from app.models import Account, Category, MerchantRule, Transaction, User
 from app.schemas.api import (
     AccountCreate,
     AccountOut,
@@ -19,29 +27,43 @@ router = APIRouter(tags=["accounts"])
 
 
 @router.post("/accounts", response_model=AccountOut, status_code=status.HTTP_201_CREATED)
-def create_account(body: AccountCreate, db: Session = Depends(get_db)) -> Account:
-    account = Account(**body.model_dump())
+def create_account(
+    body: AccountCreate, user: User = Depends(current_user), db: Session = Depends(get_db)
+) -> Account:
+    account = Account(**body.model_dump(), user_id=user.id)
     db.add(account)
     db.commit()
     return account
 
 
 @router.get("/accounts", response_model=list[AccountOut])
-def list_accounts(db: Session = Depends(get_db)) -> list[Account]:
-    return list(db.scalars(select(Account).order_by(Account.id)))
+def list_accounts(
+    user: User = Depends(current_user), db: Session = Depends(get_db)
+) -> list[Account]:
+    return list(db.scalars(select(Account).where(Account.user_id == user.id).order_by(Account.id)))
+
+
+def _visible(user: User):  # type: ignore[no-untyped-def]
+    return or_(Category.user_id.is_(None), Category.user_id == user.id)
 
 
 @router.get("/categories", response_model=list[CategoryOut])
-def list_categories(db: Session = Depends(get_db)) -> list[Category]:
-    return list(db.scalars(select(Category).order_by(Category.parent_id, Category.id)))
+def list_categories(
+    user: User = Depends(current_user), db: Session = Depends(get_db)
+) -> list[Category]:
+    """Built-in categories plus your own."""
+    return list(
+        db.scalars(select(Category).where(_visible(user)).order_by(Category.parent_id, Category.id))
+    )
 
 
 def _name_taken(
-    db: Session, name: str, parent_id: int | None, exclude_id: int | None = None
+    db: Session, user: User, name: str, parent_id: int | None, exclude_id: int | None = None
 ) -> bool:
-    # Explicit check: SQL UNIQUE treats NULL parents as distinct, so it wouldn't catch
-    # duplicate top-level groups.
+    # Checked here rather than by a UNIQUE index: names must be unique among what *this* user
+    # sees (built-ins + theirs), and SQL treats NULL parents/owners as distinct.
     stmt = select(Category.id).where(
+        _visible(user),
         func.lower(Category.name) == name.lower(),
         Category.parent_id.is_(None) if parent_id is None else Category.parent_id == parent_id,
     )
@@ -51,41 +73,48 @@ def _name_taken(
 
 
 @router.post("/categories", response_model=CategoryOut, status_code=status.HTTP_201_CREATED)
-def create_category(body: CategoryCreate, db: Session = Depends(get_db)) -> Category:
+def create_category(
+    body: CategoryCreate, user: User = Depends(current_user), db: Session = Depends(get_db)
+) -> Category:
     """Add a category under an existing group (inherits its kind), or a new top-level group."""
     kind = body.kind
     if body.parent_id is not None:
         parent = db.get(Category, body.parent_id)
-        if parent is None or parent.parent_id is not None:
+        if parent is None or parent.parent_id is not None or parent.user_id not in (None, user.id):
             raise HTTPException(
                 status.HTTP_422_UNPROCESSABLE_CONTENT, "Parent must be a top-level group"
             )
         kind = parent.kind
-    if _name_taken(db, body.name, body.parent_id):
+    if _name_taken(db, user, body.name, body.parent_id):
         raise HTTPException(
             status.HTTP_409_CONFLICT, "A category with this name already exists there"
         )
-    cat = Category(name=body.name, parent_id=body.parent_id, kind=kind, is_custom=True)
+    cat = Category(
+        name=body.name, parent_id=body.parent_id, kind=kind, is_custom=True, user_id=user.id
+    )
     db.add(cat)
     db.commit()
     return cat
 
 
-def _custom_or_403(db: Session, category_id: int) -> Category:
+def _own_custom(db: Session, user: User, category_id: int) -> Category:
     cat = db.get(Category, category_id)
-    if cat is None:
+    if cat is None or cat.user_id not in (None, user.id):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Category not found")
-    if not cat.is_custom:
+    if not cat.is_custom or cat.user_id != user.id:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Built-in categories can't be changed")
     return cat
 
 
 @router.patch("/categories/{category_id}", response_model=CategoryOut)
 def rename_category(
-    category_id: int, body: CategoryRename, db: Session = Depends(get_db)
+    category_id: int,
+    body: CategoryRename,
+    user: User = Depends(current_user),
+    db: Session = Depends(get_db),
 ) -> Category:
-    cat = _custom_or_403(db, category_id)
-    if _name_taken(db, body.name, cat.parent_id, exclude_id=cat.id):
+    cat = _own_custom(db, user, category_id)
+    if _name_taken(db, user, body.name, cat.parent_id, exclude_id=cat.id):
         raise HTTPException(
             status.HTTP_409_CONFLICT, "A category with this name already exists there"
         )
@@ -95,31 +124,26 @@ def rename_category(
 
 
 @router.delete("/categories/{category_id}", response_model=CategoryDeleteOut)
-def delete_category(category_id: int, db: Session = Depends(get_db)) -> dict[str, int]:
-    """Delete a custom category (and its children, for a group). Its transactions become
+def delete_category(
+    category_id: int, user: User = Depends(current_user), db: Session = Depends(get_db)
+) -> dict[str, int]:
+    """Delete one of your categories (and its children, for a group). Its transactions become
     uncategorized and its merchant rules are removed."""
-    cat = _custom_or_403(db, category_id)
+    cat = _own_custom(db, user, category_id)
     ids = [cat.id, *db.scalars(select(Category.id).where(Category.parent_id == cat.id))]
-    txns = (
-        db.scalar(
-            select(func.count()).select_from(Transaction).where(Transaction.category_id.in_(ids))
-        )
-        or 0
-    )
-    rules = (
-        db.scalar(
-            select(func.count()).select_from(MerchantRule).where(MerchantRule.category_id.in_(ids))
-        )
-        or 0
-    )
+    own_accounts = user_account_ids(db, user)
+    in_scope = (Transaction.category_id.in_(ids), Transaction.account_id.in_(own_accounts))
+    txns = db.scalar(select(func.count()).select_from(Transaction).where(*in_scope)) or 0
+    rules_q = (MerchantRule.category_id.in_(ids), MerchantRule.user_id == user.id)
+    rules = db.scalar(select(func.count()).select_from(MerchantRule).where(*rules_q)) or 0
     # Explicit rather than relying on ON DELETE, so behaviour doesn't depend on the database
     # enforcing foreign keys.
     db.execute(
         update(Transaction)
-        .where(Transaction.category_id.in_(ids))
+        .where(*in_scope)
         .values(category_id=None, category_source=None, rules_version=None)
     )
-    db.execute(delete(MerchantRule).where(MerchantRule.category_id.in_(ids)))
+    db.execute(delete(MerchantRule).where(*rules_q))
     db.execute(delete(Category).where(Category.parent_id == cat.id))
     db.delete(cat)
     db.commit()

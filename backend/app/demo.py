@@ -11,16 +11,18 @@ from __future__ import annotations
 
 import argparse
 import json
+import secrets
 from pathlib import Path
 
 from alembic import command
 from alembic.config import Config
 from sqlalchemy.orm import Session
 
+from app.auth import hash_password
 from app.config import BACKEND_DIR, get_settings
 from app.db import make_engine
 from app.ingestion.pipeline import DuplicateFileError, ingest
-from app.models import Account
+from app.models import Account, User
 from app.services.llm import FakeLLMClient
 
 DEMO_DB = BACKEND_DIR / "demo.db"
@@ -38,11 +40,22 @@ def build_demo(samples_dir: Path, url: str = DEMO_URL) -> list[tuple[str, str]]:
     engine = make_engine(url)
     results: list[tuple[str, str]] = []
     with Session(engine, expire_on_commit=False) as db:
+        # Everyone using demo mode is signed in as this user (see api/deps.current_user).
+        demo_user = User(
+            email="demo@example.com",
+            password_hash=hash_password(secrets.token_urlsafe(24)),
+            is_admin=False,
+        )
+        db.add(demo_user)
+        db.flush()
         for truth_path in sorted(samples_dir.glob("*.truth.json")):
             truth = json.loads(truth_path.read_text(encoding="utf-8"))
             currency = truth["mapping"]["currency"]
             account = Account(
-                bank_name="Synthetic Bank", nickname=truth["layout"], currency=currency
+                bank_name="Synthetic Bank",
+                nickname=truth["layout"],
+                currency=currency,
+                user_id=demo_user.id,
             )
             db.add(account)
             db.commit()

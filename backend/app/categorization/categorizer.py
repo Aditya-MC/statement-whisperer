@@ -30,11 +30,19 @@ from collections import Counter, defaultdict
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import ColumnElement, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.categorization.merchant import CleanMerchant, clean_merchant
-from app.models import Category, CategoryKind, CategorySource, MerchantRule, RuleSource, Transaction
+from app.models import (
+    Account,
+    Category,
+    CategoryKind,
+    CategorySource,
+    MerchantRule,
+    RuleSource,
+    Transaction,
+)
 from app.services.llm import UNCATEGORIZED, LLMClient, LLMError
 from app.services.masking import build_masked_merchant
 
@@ -64,8 +72,12 @@ class CategoryIndex:
         return self.by_id[category_id].kind
 
 
-def load_category_index(db: Session) -> CategoryIndex:
-    cats = list(db.scalars(select(Category)))
+def load_category_index(db: Session, user_id: int | None = None) -> CategoryIndex:
+    """Built-in categories plus `user_id`'s own (only built-ins when user_id is None)."""
+    visible: ColumnElement[bool] = Category.user_id.is_(None)
+    if user_id is not None:
+        visible = or_(visible, Category.user_id == user_id)
+    cats = list(db.scalars(select(Category).where(visible)))
     by_id = {c.id: c for c in cats}
     by_path = {
         f"{by_id[c.parent_id].name} > {c.name}": c.id for c in cats if c.parent_id is not None
@@ -82,10 +94,14 @@ class _Rule:
     priority: int
 
 
-def _load_rules(db: Session) -> list[_Rule]:
+def _load_rules(db: Session, user_id: int | None) -> list[_Rule]:
+    """Shared seed rules plus `user_id`'s own corrections and cached LLM answers."""
+    visible: ColumnElement[bool] = MerchantRule.user_id.is_(None)
+    if user_id is not None:
+        visible = or_(visible, MerchantRule.user_id == user_id)
     rules = [
         _Rule(r.id, tuple(r.pattern.upper().split()), r.category_id, r.source, r.priority)
-        for r in db.scalars(select(MerchantRule))
+        for r in db.scalars(select(MerchantRule).where(visible))
     ]
     return sorted(rules, key=lambda r: (-r.priority, -len(r.words), r.id))
 
@@ -179,8 +195,9 @@ class _Assigner:
         self.result.by_source[source.value] += 1
 
 
-def _target_query(account_id: int | None, only_uncategorized: bool):  # type: ignore[no-untyped-def]
+def _target_query(user_id: int, account_id: int | None, only_uncategorized: bool):  # type: ignore[no-untyped-def]
     stmt = select(Transaction).where(
+        Transaction.account_id.in_(select(Account.id).where(Account.user_id == user_id)),
         Transaction.is_transfer.is_(False),
         or_(
             Transaction.category_source.is_(None),
@@ -199,16 +216,30 @@ def categorize_transactions(
     llm: LLMClient,
     txns: Sequence[Transaction] | None = None,
     *,
+    user_id: int | None = None,
     account_id: int | None = None,
     only_uncategorized: bool = False,
 ) -> CategorizeResult:
-    """Categorize `txns` (or all eligible transactions). Flushes but does not commit."""
+    """Categorize `txns` (or all of `user_id`'s eligible transactions). Flushes, no commit.
+
+    Uses the owner's rules and categories only. When `txns` is given, the owner is taken from
+    their account, and they must all belong to one user.
+    """
     if txns is None:
-        txns = list(db.scalars(_target_query(account_id, only_uncategorized)))
+        if user_id is None:
+            raise ValueError("user_id is required when no transactions are given")
+        txns = list(db.scalars(_target_query(user_id, account_id, only_uncategorized)))
+    elif user_id is None and txns:
+        owners = set(
+            db.scalars(select(Account.user_id).where(Account.id.in_({t.account_id for t in txns})))
+        )
+        if len(owners) != 1:
+            raise ValueError("transactions from several users can't be categorized together")
+        user_id = owners.pop()
     txns = [t for t in txns if t.category_source != CategorySource.user and not t.is_transfer]
 
-    idx = load_category_index(db)
-    rules = _load_rules(db)
+    idx = load_category_index(db, user_id)
+    rules = _load_rules(db, user_id)
     result = CategorizeResult(processed=len(txns))
     assigner = _Assigner(idx, current_rules_version(db), result)
     pending: dict[str, list[Transaction]] = defaultdict(list)
@@ -248,7 +279,7 @@ def categorize_transactions(
         pending_info[key] = (clean.merchant, tuple(sorted(clean.keywords)))
 
     if pending:
-        _categorize_with_llm(db, llm, idx, rules, pending, pending_info, assigner)
+        _categorize_with_llm(db, llm, idx, rules, pending, pending_info, assigner, user_id)
 
     result.uncategorized = sum(1 for t in txns if t.category_id is None)
     db.flush()
@@ -263,6 +294,7 @@ def _categorize_with_llm(
     pending: dict[str, list[Transaction]],
     pending_info: dict[str, tuple[str, tuple[str, ...]]],
     assigner: _Assigner,
+    user_id: int | None,
 ) -> None:
     keys = list(pending)
     masked = [
@@ -294,6 +326,7 @@ def _categorize_with_llm(
         if path != UNCATEGORIZED and merchant not in existing_patterns:
             db.add(
                 MerchantRule(
+                    user_id=user_id,  # cached answers stay private to their user
                     pattern=merchant,
                     category_id=category_id,
                     source=RuleSource.llm,
@@ -308,6 +341,7 @@ def apply_user_correction(
 ) -> int:
     """Set a category by hand, remember it as a user rule, and optionally apply it to other
     non-user transactions with the same merchant. Returns how many other rows changed."""
+    user_id = db.scalar(select(Account.user_id).where(Account.id == txn.account_id))
     merchant = txn.cleaned_merchant or clean_merchant(txn.raw_narration).merchant
     txn.cleaned_merchant = merchant
     txn.category_id = category_id
@@ -318,12 +352,18 @@ def apply_user_correction(
         db.flush()
         return 0
 
-    old = db.scalar(select(MerchantRule).where(MerchantRule.pattern == merchant))
+    # Replace this user's own rule for the merchant (never a shared seed rule).
+    old = db.scalar(
+        select(MerchantRule).where(
+            MerchantRule.user_id == user_id, MerchantRule.pattern == merchant
+        )
+    )
     if old is not None:
         db.delete(old)
         db.flush()
     db.add(
         MerchantRule(
+            user_id=user_id,
             pattern=merchant,
             category_id=category_id,
             source=RuleSource.user,
@@ -335,10 +375,11 @@ def apply_user_correction(
     txn.rules_version = version
 
     changed = 0
-    assigner = _Assigner(load_category_index(db), version, CategorizeResult())
+    assigner = _Assigner(load_category_index(db, user_id), version, CategorizeResult())
     if apply_to_similar:
         others = db.scalars(
             select(Transaction).where(
+                Transaction.account_id.in_(select(Account.id).where(Account.user_id == user_id)),
                 Transaction.cleaned_merchant == merchant,
                 Transaction.id != txn.id,
                 Transaction.is_transfer.is_(False),

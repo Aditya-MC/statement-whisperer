@@ -13,11 +13,12 @@ from sqlalchemy.orm import Session, sessionmaker
 
 import app.models  # noqa: F401
 from app.api.deps import get_llm
+from app.auth import COOKIE_NAME, create_session, hash_password
 from app.categories import seed_categories
 from app.categorization.seed_rules import seed_merchant_rules
 from app.config import REPO_ROOT
 from app.db import Base, get_db, make_engine
-from app.models import Account
+from app.models import Account, User
 from app.services.llm import FakeLLMClient, LLMClient
 
 SAMPLES_DIR = REPO_ROOT / "samples" / "synthetic"
@@ -71,9 +72,27 @@ def db(engine: Engine) -> Iterator[Session]:
         yield session
 
 
+TEST_PASSWORD = "correct-horse-battery"
+
+
+def make_user(db: Session, email: str, *, is_admin: bool = False) -> User:
+    user = User(email=email, password_hash=hash_password(TEST_PASSWORD), is_admin=is_admin)
+    db.add(user)
+    db.commit()
+    return user
+
+
 @pytest.fixture
-def account(db: Session) -> Account:
-    acct = Account(bank_name="Example Bank", nickname="Main", currency="USD", last4="1234")
+def user(db: Session) -> User:
+    """The owner used by most tests (the first, admin user)."""
+    return make_user(db, "owner@example.com", is_admin=True)
+
+
+@pytest.fixture
+def account(db: Session, user: User) -> Account:
+    acct = Account(
+        bank_name="Example Bank", nickname="Main", currency="USD", last4="1234", user_id=user.id
+    )
     db.add(acct)
     db.commit()
     return acct
@@ -91,7 +110,8 @@ def llm_override(fake_llm: FakeLLMClient) -> dict[str, LLMClient]:
 
 
 @pytest.fixture
-def client(engine: Engine, llm_override: dict[str, LLMClient]) -> Iterator[TestClient]:
+def anon_client(engine: Engine, llm_override: dict[str, LLMClient]) -> Iterator[TestClient]:
+    """API client with no session (for auth tests)."""
     from app.main import app
 
     factory = sessionmaker(bind=engine, expire_on_commit=False)
@@ -105,6 +125,30 @@ def client(engine: Engine, llm_override: dict[str, LLMClient]) -> Iterator[TestC
     with TestClient(app) as c:
         yield c
     app.dependency_overrides.clear()
+
+
+def signed_in(client: TestClient, db: Session, user: User) -> TestClient:
+    """Put a fresh session cookie for `user` on `client`."""
+    token = create_session(db, user, days=1)
+    db.commit()
+    client.cookies.set(COOKIE_NAME, token)
+    return client
+
+
+@pytest.fixture
+def client(anon_client: TestClient, db: Session, user: User) -> TestClient:
+    """API client signed in as `user` (the owner)."""
+    return signed_in(anon_client, db, user)
+
+
+@pytest.fixture
+def other_client(engine: Engine, db: Session, client: TestClient) -> Iterator[TestClient]:
+    """A second, independent client signed in as a different (non-admin) user."""
+    from app.main import app
+
+    other = make_user(db, "other@example.com")
+    with TestClient(app) as c:
+        yield signed_in(c, db, other)
 
 
 @pytest.fixture(scope="session")
