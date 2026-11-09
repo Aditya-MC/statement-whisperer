@@ -170,6 +170,15 @@ erDiagram
     transactions |o--o| transactions : transfer_peer
 ```
 
+- **users / sessions / invites** (migration `0006`):
+  - Users have an email, an argon2id password hash and an admin flag.
+  - Sessions store only the SHA-256 of the cookie token, plus an expiry.
+  - Invites are single-use codes.
+- **Ownership:**
+  - `accounts.user_id` owns a ledger; imports and transactions belong to a user through their account.
+  - `categories.user_id` and `merchant_rules.user_id` are NULL for shared built-ins and seed rules, and set for a user's custom categories, corrections and cached LLM answers.
+  - Rows created before multi-user support start unowned and are claimed by the first admin at sign-up.
+  - Every API dependency resolves the signed-in user, and every query filters on it. See `app/api/deps.py` and `tests/api/test_isolation.py`.
 - **accounts**: bank name, nickname, currency, and `last4` only (a DB check constraint enforces 4 characters).
 - **imports**: file hash, file type, status, parser version, mapping and its source (`user`, `saved` or `llm`), header labels, validation report, date range, opening/closing balance, counts.
 - **transactions**: date, signed amount (negative = money out), type, balance, currency, `raw_narration` (immutable), `row_index`, `dedupe_hash` (unique), categorization fields (`cleaned_merchant` (indexed), `category_id`, `category_source`, `rules_version`), and transfer fields (`is_transfer`, `transfer_peer_id`, `transfer_dismissed`).

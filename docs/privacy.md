@@ -41,7 +41,16 @@ With no API key configured, or in demo mode, nothing is sent anywhere. Imports l
 | SHA-256 hash of each uploaded file (for duplicate detection) | File names |
 | The column mapping and the statement's header labels | Full account numbers (only `last4`, enforced by a DB constraint and API validation) |
 | A validation report (row numbers and messages, no cell values) | PDF passwords (Phase 4: used in memory only) |
-| Merchant rules (your corrections, which may include a payee's name, stay local) | |
+| Merchant rules (your corrections, which may include a payee's name, stay private to you) | Plain-text passwords (argon2id hashes only) |
+| Your email and a hash of each session token | Raw session tokens (only your browser holds them) |
+
+## Multiple users (shared server)
+
+Each user's data is isolated by the application. Every query is filtered by the signed-in user, someone else's ids return "not found", and `tests/api/test_isolation.py` plus a live end-to-end check enforce this. Shared between users are only things that contain no personal data:
+- built-in categories and brand rules;
+- the column *structure* of a bank's statement layout (column positions, date and number format), so one tester mapping an IOB statement helps the next. No header labels or values from another user's file are ever shown.
+
+**Be honest with testers:** whoever runs the server (the admin) and the hosting/database provider can technically read the database, as with any web app. The app gives the admin no screen for viewing other people's data, but it is not end-to-end encrypted. Testers should know this before uploading real statements, or test with a sample statement first. **Delete account** removes a user's data from the live database.
 
 ## What is logged
 

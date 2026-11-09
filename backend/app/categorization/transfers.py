@@ -22,14 +22,20 @@ from app.models import Account, CategorySource, Transaction
 DEFAULT_WINDOW_DAYS = 3
 
 
-def link_transfers(db: Session, window_days: int = DEFAULT_WINDOW_DAYS) -> int:
-    """Find and link new transfer pairs. Returns the number of pairs linked. Flushes only."""
-    if (db.scalar(select(func.count()).select_from(Account)) or 0) < 2:
+def link_transfers(db: Session, user_id: int | None, window_days: int = DEFAULT_WINDOW_DAYS) -> int:
+    """Find and link new transfer pairs between `user_id`'s own accounts (never across users).
+    Returns the number of pairs linked. Flushes only."""
+    own_accounts = select(Account.id).where(Account.user_id == user_id)
+    if (db.scalar(select(func.count()).select_from(own_accounts.subquery())) or 0) < 2:
         return 0
     candidates = list(
         db.scalars(
             select(Transaction)
-            .where(Transaction.is_transfer.is_(False), Transaction.transfer_dismissed.is_(False))
+            .where(
+                Transaction.account_id.in_(own_accounts),
+                Transaction.is_transfer.is_(False),
+                Transaction.transfer_dismissed.is_(False),
+            )
             .order_by(Transaction.date, Transaction.id)
         )
     )
@@ -38,7 +44,7 @@ def link_transfers(db: Session, window_days: int = DEFAULT_WINDOW_DAYS) -> int:
         if t.amount > 0:
             credits[t.amount].append(t)
 
-    idx = load_category_index(db)
+    idx = load_category_index(db, user_id)
     self_transfer = idx.by_path.get(SELF_TRANSFER)
     version = current_rules_version(db)
     used: set[int] = set()

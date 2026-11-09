@@ -31,7 +31,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.categorization.categorizer import REFUNDS, SELF_TRANSFER, load_category_index
-from app.models import Category, Transaction
+from app.models import Account, Category, Transaction
 
 ZERO = Decimal("0")
 #: Up to this many days the time series is weekly; beyond it, monthly.
@@ -69,9 +69,14 @@ def _money(d: Decimal) -> str:
 
 
 def _load_rows(
-    db: Session, account_id: int | None, date_from: date | None, date_to: date | None
+    db: Session,
+    user_id: int,
+    account_id: int | None,
+    date_from: date | None,
+    date_to: date | None,
 ) -> list[_Row]:
-    idx = load_category_index(db)
+    """`user_id`'s transactions only (optionally one of their accounts and a date range)."""
+    idx = load_category_index(db, user_id)
     self_transfer = idx.by_path.get(SELF_TRANSFER)
     stmt = select(
         Transaction.date,
@@ -80,7 +85,7 @@ def _load_rows(
         Transaction.category_id,
         Transaction.cleaned_merchant,
         Transaction.is_transfer,
-    )
+    ).where(Transaction.account_id.in_(select(Account.id).where(Account.user_id == user_id)))
     if account_id is not None:
         stmt = stmt.where(Transaction.account_id == account_id)
     if date_from is not None:
@@ -182,6 +187,7 @@ PIE_SLOTS = 5
 
 def _pie(
     db: Session,
+    user_id: int,
     counted: list[_Row],
     by_group: dict[int | None, _Tally],
     money_out: Decimal,
@@ -197,7 +203,7 @@ def _pie(
     """
     if not money_out:
         return []
-    all_time = _load_rows(db, None, None, None)
+    all_time = _load_rows(db, user_id, None, None, None)
     totals: dict[int, Decimal] = defaultdict(lambda: ZERO)
     for r in all_time:
         if r.currency == currency and r.amount < 0 and not r.excluded:
@@ -243,23 +249,31 @@ def _pie(
 def dashboard(
     db: Session,
     *,
+    user_id: int,
     account_id: int | None = None,
     date_from: date | None = None,
     date_to: date | None = None,
     currency: str | None = None,
 ) -> dict[str, object]:
+    """Everything the dashboard shows for `user_id`'s data (never anyone else's)."""
     # Currencies come from all of the account's data (not just this range), so the picker stays
     # stable as dates change and an empty range still has a currency for recurring payments.
-    cur_stmt = select(Transaction.currency, func.count()).group_by(Transaction.currency)
+    cur_stmt = (
+        select(Transaction.currency, func.count())
+        .where(Transaction.account_id.in_(select(Account.id).where(Account.user_id == user_id)))
+        .group_by(Transaction.currency)
+    )
     if account_id is not None:
         cur_stmt = cur_stmt.where(Transaction.account_id == account_id)
     currencies = [c for c, _ in sorted(db.execute(cur_stmt).all(), key=lambda r: -r[1])]
     chosen = (currency or "").upper() or (currencies[0] if currencies else None)
-    rows = [r for r in _load_rows(db, account_id, date_from, date_to) if r.currency == chosen]
+    rows = [
+        r for r in _load_rows(db, user_id, account_id, date_from, date_to) if r.currency == chosen
+    ]
 
-    idx = load_category_index(db)
+    idx = load_category_index(db, user_id)
     refunds_id = idx.by_path.get(REFUNDS)
-    cats = {c.id: c for c in db.scalars(select(Category))}
+    cats = idx.by_id
 
     def group_of(category_id: int | None) -> Category | None:
         c = cats.get(category_id) if category_id is not None else None
@@ -358,12 +372,14 @@ def dashboard(
     as_of = end or date.today()
     history = [
         r
-        for r in _load_rows(db, account_id, as_of - timedelta(days=RECURRING_LOOKBACK_DAYS), as_of)
+        for r in _load_rows(
+            db, user_id, account_id, as_of - timedelta(days=RECURRING_LOOKBACK_DAYS), as_of
+        )
         if r.currency == chosen
     ]
     recurring = _detect_recurring(history, as_of)
 
-    pie = _pie(db, counted, by_group, money_out, chosen, group_of)
+    pie = _pie(db, user_id, counted, by_group, money_out, chosen, group_of)
 
     uncategorized = [r for r in counted if r.amount < 0 and r.category_id is None]
     return {

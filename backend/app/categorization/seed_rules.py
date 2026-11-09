@@ -80,7 +80,9 @@ SEED_RULES: list[tuple[str, str]] = [
 def seed_merchant_rules(session: Session) -> int:
     """Insert missing seed rules (idempotent). Returns the number added."""
     idx = load_category_index(session)
-    existing = set(session.scalars(select(MerchantRule.pattern)))
+    existing = set(
+        session.scalars(select(MerchantRule.pattern).where(MerchantRule.user_id.is_(None)))
+    )
     added = 0
     for pattern, path in SEED_RULES:
         if pattern in existing:

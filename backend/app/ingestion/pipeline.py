@@ -100,7 +100,7 @@ def ingest(
         db.rollback()
         raise
     if new_rows:
-        _categorize_new(db, llm, new_rows)
+        _categorize_new(db, llm, new_rows, account.user_id)
     db.commit()
     log.info(
         "import id=%s status=%s rows=%s inserted=%s duplicates=%s",
@@ -254,8 +254,10 @@ _SAVED_MAPPING_SCAN = 200
 def find_saved_mapping(db: Session, account_id: int, columns: list[str]) -> ColumnMapping | None:
     """Mapping from the most recent completed import with the same column headers.
 
-    Prefers the same account. Lets a bank's layout be mapped once (by the user or the LLM)
-    and reused for every later statement with no LLM call. Validation still checks every
+    Prefers the same account, then any account. Lets a bank's layout be mapped once (by the
+    user or the LLM) and reused for every later statement with no LLM call. Across users, only
+    the structural mapping is reused (column indexes, date and number format). No data or
+    header labels from someone else's import are ever returned. Validation still checks every
     import, so a layout that changed only subtly can't slip through.
     """
     key = _header_key(columns)
@@ -277,7 +279,9 @@ def find_saved_mapping(db: Session, account_id: int, columns: list[str]) -> Colu
         return None
 
 
-def _categorize_new(db: Session, llm: LLMClient, rows: list[Transaction]) -> None:
+def _categorize_new(
+    db: Session, llm: LLMClient, rows: list[Transaction], user_id: int | None
+) -> None:
     """Categorize freshly imported rows and link transfers.
 
     Runs in a savepoint: if anything here fails, the validated import is still kept and its
@@ -285,8 +289,8 @@ def _categorize_new(db: Session, llm: LLMClient, rows: list[Transaction]) -> Non
     """
     try:
         with db.begin_nested():
-            result = categorize_transactions(db, llm, rows)
-            pairs = link_transfers(db)
+            result = categorize_transactions(db, llm, rows, user_id=user_id)
+            pairs = link_transfers(db, user_id)
         log.info(
             "categorized rows=%s sources=%s llm_merchants=%s uncategorized=%s transfers=%s",
             result.processed, dict(result.by_source), result.llm_merchants,

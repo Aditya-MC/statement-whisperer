@@ -11,6 +11,51 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from app.models import CategoryKind, CategorySource, ImportStatus, RuleSource, TxnType
 
 
+class SignupIn(BaseModel):
+    email: str = Field(max_length=254)
+    password: str = Field(min_length=10, max_length=256, description="At least 10 characters.")
+    invite_code: str | None = Field(default=None, max_length=64)
+
+
+class LoginIn(BaseModel):
+    email: str = Field(max_length=254)
+    password: str = Field(max_length=256)
+
+
+class DeleteMeIn(BaseModel):
+    password: str = Field(max_length=256)
+
+
+class UserOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    email: str
+    is_admin: bool
+    created_at: datetime
+
+
+class AuthStatusOut(BaseModel):
+    has_users: bool
+    demo_mode: bool
+
+
+class InviteCreate(BaseModel):
+    note: str | None = Field(
+        default=None, max_length=200, description="Who it's for (only you see this)."
+    )
+
+
+class InviteOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    code: str
+    note: str | None
+    created_at: datetime
+    used_at: datetime | None
+
+
 class AccountCreate(BaseModel):
     bank_name: str = Field(min_length=1, max_length=100)
     nickname: str = Field(min_length=1, max_length=100)

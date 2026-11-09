@@ -1,10 +1,12 @@
 import { Suspense, lazy, useCallback, useEffect, useState } from "react";
+import AccountPage from "./components/AccountPage.jsx";
+import AuthPage from "./components/AuthPage.jsx";
 import ImportPage from "./components/ImportPage.jsx";
 import RulesPage from "./components/RulesPage.jsx";
 import ThemeToggle from "./components/ThemeToggle.jsx";
 import TransactionsPage from "./components/TransactionsPage.jsx";
 import { Toast } from "./components/ui.jsx";
-import { api } from "./lib/api.js";
+import { api, setUnauthorizedHandler } from "./lib/api.js";
 
 // Charts (Recharts) are only needed on the dashboard, so that code loads on demand.
 const DashboardPage = lazy(() => import("./components/dashboard/DashboardPage.jsx"));
@@ -14,6 +16,7 @@ const TABS = [
   { id: "transactions", label: "Transactions" },
   { id: "import", label: "Import" },
   { id: "categories", label: "Categories" },
+  { id: "account", label: "Account", hidden: true }, // opened from the email in the header
 ];
 
 function tabFromHash() {
@@ -22,7 +25,60 @@ function tabFromHash() {
   return TABS.some((t) => t.id === id) ? id : "dashboard";
 }
 
+/** Decides between the sign-in screen and the app. */
 export default function App() {
+  // loading | signed_out | signed_in
+  const [state, setState] = useState({ phase: "loading", user: null, firstRun: false, error: null });
+
+  const check = useCallback(async () => {
+    try {
+      const status = await api.authStatus();
+      try {
+        const user = await api.me();
+        setState({ phase: "signed_in", user, firstRun: false, error: null });
+      } catch {
+        setState({ phase: "signed_out", user: null, firstRun: !status.has_users, error: null });
+      }
+    } catch (e) {
+      setState({ phase: "signed_out", user: null, firstRun: false, error: e.message });
+    }
+  }, []);
+
+  useEffect(() => {
+    check();
+    // A 401 anywhere (expired session, signed out in another tab) returns to sign-in.
+    setUnauthorizedHandler(() => setState((s) => ({ ...s, phase: "signed_out", user: null })));
+    return () => setUnauthorizedHandler(null);
+  }, [check]);
+
+  if (state.phase === "loading") return null;
+  if (state.phase === "signed_out") {
+    return (
+      <>
+        {state.error && (
+          <p className="bg-critical px-4 py-2 text-center text-sm text-white">
+            Could not reach the server: {state.error}
+          </p>
+        )}
+        <AuthPage
+          firstRun={state.firstRun}
+          onSignedIn={(user) => setState({ phase: "signed_in", user, firstRun: false, error: null })}
+        />
+      </>
+    );
+  }
+  const signOut = async () => {
+    try {
+      await api.logout();
+    } finally {
+      window.location.hash = "";
+      setState({ phase: "signed_out", user: null, firstRun: false, error: null });
+    }
+  };
+  return <LedgerApp key={state.user.id} user={state.user} onSignOut={signOut} onDeleted={check} />;
+}
+
+function LedgerApp({ user, onSignOut, onDeleted }) {
   // The active tab lives in the URL hash so tabs can be bookmarked and survive reloads.
   const [tab, setTabState] = useState(tabFromHash);
   const setTab = useCallback((id) => {
@@ -76,7 +132,7 @@ export default function App() {
         <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-8 gap-y-2 px-4 py-3">
           <h1 className="text-[15px] font-semibold tracking-tight">Statement Whisperer</h1>
           <nav className="flex gap-1" aria-label="Sections">
-            {TABS.map((t) => (
+            {TABS.filter((t) => !t.hidden).map((t) => (
               <button
                 key={t.id}
                 type="button"
@@ -99,6 +155,16 @@ export default function App() {
                 <span aria-hidden="true" className="size-2 rounded-full bg-[#fab219]" />
                 Demo · synthetic data
               </span>
+            )}
+            {!health?.demo_mode && (
+              <button
+                type="button"
+                className="max-w-48 truncate text-xs text-muted hover:text-ink"
+                title="Account"
+                onClick={() => setTab("account")}
+              >
+                {user.email}
+              </button>
             )}
             <ThemeToggle />
           </div>
@@ -145,6 +211,9 @@ export default function App() {
         )}
         {tab === "categories" && (
           <RulesPage categories={categories} notify={notify} onCategoriesChanged={reloadCategories} />
+        )}
+        {tab === "account" && (
+          <AccountPage user={user} onSignOut={onSignOut} onDeleted={onDeleted} notify={notify} />
         )}
       </main>
 

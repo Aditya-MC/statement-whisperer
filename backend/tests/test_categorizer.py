@@ -54,6 +54,10 @@ def add_txn(db: Session, imp: Import, narration: str, amount: str, d: int = 1,
     return t
 
 
+def account_owner(db: Session, imp: Import) -> int | None:
+    return db.get(Account, imp.account_id).user_id  # type: ignore[union-attr]
+
+
 def path_of(db: Session, t: Transaction) -> str | None:
     if t.category_id is None:
         return None
@@ -151,31 +155,33 @@ def test_user_categories_are_never_overwritten(db: Session, imp: Import) -> None
     travel = load_category_index(db).by_path["Leisure > Travel"]
     apply_user_correction(db, t, travel, apply_to_similar=False)
     db.flush()
-    categorize_transactions(db, FakeLLMClient())  # full re-run
+    categorize_transactions(db, FakeLLMClient(), user_id=account_owner(db, imp))  # full re-run
     assert path_of(db, t) == "Leisure > Travel" and t.category_source == CategorySource.user
 
 
 def test_transfers_between_own_accounts(db: Session, imp: Import) -> None:
-    savings = Account(bank_name="Other Bank", nickname="Savings", currency="USD")
+    savings = Account(
+        bank_name="Other Bank", nickname="Savings", currency="USD", user_id=account_owner(db, imp)
+    )
     db.add(savings)
     db.flush()
     out = add_txn(db, imp, "NEFT DR-0012345678-SELF", "-1000.00", d=5)
     into = add_txn(db, imp, "NEFT CR-0012345678-SELF", "1000.00", d=6, account_id=savings.id)
     unrelated = add_txn(db, imp, "NEFT CR-0012345678-SELF", "1000.00", d=20, account_id=savings.id)
 
-    assert link_transfers(db) == 1
+    assert link_transfers(db, account_owner(db, imp)) == 1
     assert out.is_transfer and into.is_transfer and not unrelated.is_transfer
     assert out.transfer_peer_id == into.id and into.transfer_peer_id == out.id
     assert path_of(db, out) == "Transfers > Self Transfer"
     # Transfers are skipped by the categorizer.
-    categorize_transactions(db, FakeLLMClient())
+    categorize_transactions(db, FakeLLMClient(), user_id=account_owner(db, imp))
     assert path_of(db, into) == "Transfers > Self Transfer"
 
 
 def test_no_transfers_with_single_account(db: Session, imp: Import) -> None:
     add_txn(db, imp, "A", "-50.00")
     add_txn(db, imp, "B", "50.00")
-    assert link_transfers(db) == 0
+    assert link_transfers(db, account_owner(db, imp)) == 0
 
 
 def test_brand_rules_beat_person_heuristic(db: Session, imp: Import) -> None:

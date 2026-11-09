@@ -16,12 +16,12 @@ from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_llm
+from app.api.deps import current_user, get_llm, owned_account, user_account_ids
 from app.config import get_settings
 from app.db import get_db
 from app.ingestion.detect import UnsupportedFileError
 from app.ingestion.pipeline import DuplicateFileError, FileMismatchError, ingest
-from app.models import Account, Import, ImportStatus
+from app.models import Account, Import, ImportStatus, User
 from app.schemas.api import ErrorOut, ImportOut
 from app.schemas.mapping import ColumnMapping
 from app.services.llm import LLMClient
@@ -96,12 +96,11 @@ async def create_import(
     mapping: str | None = Form(
         default=None, description="Optional ColumnMapping JSON to skip automatic detection."
     ),
+    user: User = Depends(current_user),
     db: Session = Depends(get_db),
     llm: LLMClient = Depends(get_llm),
 ) -> Import | JSONResponse:
-    account = db.get(Account, account_id)
-    if account is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Account not found")
+    account = owned_account(db, user, account_id)
     override = _parse_mapping(mapping)
     filename = file.filename
     data = await _read_upload(file)
@@ -113,6 +112,7 @@ async def retry_import(
     import_id: int,
     file: UploadFile = File(..., description="The same statement file as the original upload."),
     mapping: str | None = Form(default=None, description="Corrected ColumnMapping JSON."),
+    user: User = Depends(current_user),
     db: Session = Depends(get_db),
     llm: LLMClient = Depends(get_llm),
 ) -> Import | JSONResponse:
@@ -120,13 +120,10 @@ async def retry_import(
 
     The original file must be uploaded again because uploads are never kept on the server.
     """
-    imp = db.get(Import, import_id)
-    if imp is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Import not found")
+    imp = _owned_import(db, user, import_id)
     if imp.status == ImportStatus.completed:
         raise HTTPException(status.HTTP_409_CONFLICT, "Import already completed")
-    account = db.get(Account, imp.account_id)
-    assert account is not None
+    account = owned_account(db, user, imp.account_id)
     override = _parse_mapping(mapping)
     filename = file.filename
     data = await _read_upload(file)
@@ -135,17 +132,31 @@ async def retry_import(
     )
 
 
-@router.get("/imports/{import_id}", response_model=ImportOut)
-def get_import(import_id: int, db: Session = Depends(get_db)) -> Import:
+def _owned_import(db: Session, user: User, import_id: int) -> Import:
     imp = db.get(Import, import_id)
-    if imp is None:
+    if imp is None or imp.account_id not in user_account_ids(db, user):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Import not found")
     return imp
 
 
+@router.get("/imports/{import_id}", response_model=ImportOut)
+def get_import(
+    import_id: int, user: User = Depends(current_user), db: Session = Depends(get_db)
+) -> Import:
+    return _owned_import(db, user, import_id)
+
+
 @router.get("/imports", response_model=list[ImportOut])
-def list_imports(account_id: int | None = None, db: Session = Depends(get_db)) -> list[Import]:
-    stmt = select(Import).order_by(Import.id.desc())
+def list_imports(
+    account_id: int | None = None,
+    user: User = Depends(current_user),
+    db: Session = Depends(get_db),
+) -> list[Import]:
+    stmt = (
+        select(Import)
+        .where(Import.account_id.in_(user_account_ids(db, user)))
+        .order_by(Import.id.desc())
+    )
     if account_id is not None:
         stmt = stmt.where(Import.account_id == account_id)
     return list(db.scalars(stmt))

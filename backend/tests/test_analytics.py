@@ -8,11 +8,12 @@ from itertools import count
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.analytics import dashboard
 from app.categorization.categorizer import load_category_index
-from app.models import Account, Import, ImportStatus, Transaction, TxnType
+from app.models import Account, Import, ImportStatus, Transaction, TxnType, User
 
 _seq = count()
 
@@ -50,6 +51,12 @@ def add(
     return t
 
 
+def dash(db: Session, **kwargs: object) -> dict[str, object]:
+    """dashboard() for the test owner (the first user), like the API does for the signed-in user."""
+    uid = db.scalar(select(User.id).order_by(User.id))
+    return dashboard(db, user_id=uid, **kwargs)  # type: ignore[arg-type]
+
+
 D = date(2026, 10, 1)
 
 
@@ -61,7 +68,7 @@ def test_summary_definitions(db: Session, imp: Import) -> None:
     add(db, imp, D, "-300.00", category="Transfers > Self Transfer", transfer=True)
     add(db, imp, D, "-40.00", category="Transfers > Transfer to Others", merchant="JOHN Q")
 
-    s = dashboard(db)["summary"]
+    s = dash(db)["summary"]
     assert s["income"] == "1000.00"
     assert s["refunds"] == "20.00"
     assert s["money_out"] == "290.00"  # own transfer excluded; paying a person counts
@@ -73,19 +80,19 @@ def test_summary_definitions(db: Session, imp: Import) -> None:
 
 def test_self_transfer_category_excluded_even_if_not_linked(db: Session, imp: Import) -> None:
     add(db, imp, D, "-500.00", category="Transfers > Self Transfer")
-    assert dashboard(db)["summary"]["money_out"] == "0.00"
+    assert dash(db)["summary"]["money_out"] == "0.00"
 
 
 def test_no_income_means_no_savings_rate(db: Session, imp: Import) -> None:
     add(db, imp, D, "-10.00")
-    assert dashboard(db)["summary"]["savings_rate"] is None
+    assert dash(db)["summary"]["savings_rate"] is None
 
 
 def test_by_category_groups_parents_and_uncategorized(db: Session, imp: Import) -> None:
     add(db, imp, D, "-200.00", category="Food > Groceries")
     add(db, imp, D, "-50.00", category="Food > Restaurants")
     add(db, imp, D, "-30.00")
-    rows = dashboard(db)["by_category"]
+    rows = dash(db)["by_category"]
     assert [(r["name"], r["amount"], r["count"]) for r in rows] == [
         ("Food", "250.00", 2),
         ("Uncategorized", "30.00", 1),
@@ -103,7 +110,7 @@ def test_more_than_eight_groups_fold_into_other(db: Session, imp: Import) -> Non
              "Cash > ATM Withdrawal", "Financial > Taxes"]  # fmt: skip
     for i, p in enumerate(paths):
         add(db, imp, D, f"-{100 - i}.00", category=p)
-    rows = dashboard(db)["by_category"]
+    rows = dash(db)["by_category"]
     assert len(rows) == 9
     assert rows[-1]["name"] == "Other (2)" and rows[-1]["is_other"] is True
     assert rows[-1]["amount"] == f"{91 + 92}.00"
@@ -113,7 +120,7 @@ def test_weekly_series_for_short_ranges_fills_gaps(db: Session, imp: Import) -> 
     add(db, imp, date(2026, 10, 1), "-10.00")
     add(db, imp, date(2026, 10, 20), "-30.00")
     add(db, imp, date(2026, 10, 21), "5.00", category="Income > Refunds")
-    out = dashboard(db, date_from=date(2026, 10, 1), date_to=date(2026, 10, 31))
+    out = dash(db, date_from=date(2026, 10, 1), date_to=date(2026, 10, 31))
     assert out["period"]["granularity"] == "week"
     series = out["series"]
     assert series[0]["start"] == "2026-09-28"  # Monday of the first week
@@ -123,7 +130,7 @@ def test_weekly_series_for_short_ranges_fills_gaps(db: Session, imp: Import) -> 
 def test_monthly_series_for_long_ranges(db: Session, imp: Import) -> None:
     add(db, imp, date(2026, 1, 15), "100.00", category="Income > Salary")
     add(db, imp, date(2026, 3, 15), "-40.00")
-    out = dashboard(db)
+    out = dash(db)
     assert out["period"]["granularity"] == "month"
     assert [(s["label"], s["income"], s["spending"]) for s in out["series"]] == [
         ("Jan 2026", "100.00", "0.00"),
@@ -136,17 +143,17 @@ def test_currencies_are_never_mixed(db: Session, imp: Import) -> None:
     add(db, imp, D, "-10.00", currency="INR")
     add(db, imp, D, "-20.00", currency="INR")
     add(db, imp, D, "-99.00", currency="USD")
-    default = dashboard(db)
+    default = dash(db)
     assert default["currency"] == "INR" and default["currencies"] == ["INR", "USD"]
     assert default["summary"]["money_out"] == "30.00"
-    assert dashboard(db, currency="usd")["summary"]["money_out"] == "99.00"
+    assert dash(db, currency="usd")["summary"]["money_out"] == "99.00"
 
 
 def test_top_merchants(db: Session, imp: Import) -> None:
     for _ in range(3):
         add(db, imp, D, "-10.00", merchant="SMALL")
     add(db, imp, D, "-50.00", merchant="BIG")
-    tops = dashboard(db)["top_merchants"]
+    tops = dash(db)["top_merchants"]
     assert [(t["merchant"], t["amount"], t["count"]) for t in tops] == [
         ("BIG", "50.00", 1),
         ("SMALL", "30.00", 3),
@@ -162,7 +169,7 @@ def monthly(
 
 def test_recurring_monthly_detected(db: Session, imp: Import) -> None:
     monthly(db, imp, "MYJIO", ["-349.00", "-349.00", "-349.00", "-399.00"], date(2026, 7, 5))
-    rec = dashboard(db, date_to=date(2026, 10, 20))["recurring"]
+    rec = dash(db, date_to=date(2026, 10, 20))["recurring"]
     assert len(rec) == 1
     r = rec[0]
     assert r["merchant"] == "MYJIO" and r["cadence"] == "monthly" and r["occurrences"] == 4
@@ -172,7 +179,7 @@ def test_recurring_monthly_detected(db: Session, imp: Import) -> None:
 
 def test_recurring_weekly_detected_with_monthly_cost(db: Session, imp: Import) -> None:
     monthly(db, imp, "MILK", ["-60.00"] * 5, date(2026, 9, 1), gap=7)
-    r = dashboard(db, date_to=date(2026, 10, 1))["recurring"][0]
+    r = dash(db, date_to=date(2026, 10, 1))["recurring"][0]
     assert r["cadence"] == "weekly"
     assert Decimal(r["monthly_cost"]) == Decimal("260.00")  # 60 * 52 / 12
 
@@ -190,17 +197,17 @@ def test_recurring_rejects_irregular(
     db: Session, imp: Import, amounts: list[str], gap: int, as_of: date
 ) -> None:
     monthly(db, imp, "THING", amounts, date(2026, 6, 1), gap=gap)
-    assert dashboard(db, date_to=as_of)["recurring"] == []
+    assert dash(db, date_to=as_of)["recurring"] == []
 
 
 def test_recurring_looks_back_beyond_selected_range(db: Session, imp: Import) -> None:
     monthly(db, imp, "NETFLIX", ["-649.00"] * 4, date(2026, 7, 1))
-    out = dashboard(db, date_from=date(2026, 10, 1), date_to=date(2026, 10, 31))
+    out = dash(db, date_from=date(2026, 10, 1), date_to=date(2026, 10, 31))
     assert [r["merchant"] for r in out["recurring"]] == ["NETFLIX"]
 
 
 def test_empty_database(db: Session) -> None:
-    out = dashboard(db)
+    out = dash(db)
     assert out["currency"] is None and out["series"] == [] and out["by_category"] == []
     assert out["summary"]["spending"] == "0.00"
 
@@ -226,7 +233,7 @@ def test_pie_top_groups_plus_other(db: Session, imp: Import) -> None:
     for path, amount in spend.items():
         add(db, imp, D, f"-{amount}.00", category=path)
     add(db, imp, D, "-20.00")  # uncategorized
-    pie = dashboard(db)["pie"]
+    pie = dash(db)["pie"]
     assert [(p["name"], p["slot"]) for p in pie] == [
         ("Housing", 0), ("Food", 1), ("Transport", 2), ("Bills", 3), ("Health", 4), ("Other", None)
     ]  # fmt: skip
@@ -239,11 +246,11 @@ def test_pie_colors_follow_the_category_not_the_period(db: Session, imp: Import)
     add(db, imp, date(2026, 9, 1), "-1000.00", category="Housing > Rent")
     add(db, imp, date(2026, 10, 1), "-100.00", category="Food > Groceries")
     add(db, imp, date(2026, 10, 2), "-50.00", category="Transport > Fuel")
-    october = dashboard(db, date_from=date(2026, 10, 1), date_to=date(2026, 10, 31))["pie"]
+    october = dash(db, date_from=date(2026, 10, 1), date_to=date(2026, 10, 31))["pie"]
     # Food is #1 in October but keeps its all-time slot (Housing holds slot 0).
     assert [(p["name"], p["slot"]) for p in october] == [("Food", 1), ("Transport", 2)]
 
 
 def test_pie_empty_without_spending(db: Session, imp: Import) -> None:
     add(db, imp, D, "100.00", category="Income > Salary")
-    assert dashboard(db)["pie"] == []
+    assert dash(db)["pie"] == []
