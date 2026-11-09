@@ -307,6 +307,10 @@ def build_llm_client(settings: Settings) -> LLMClient:
     """Pick the client implied by settings. Demo mode never makes network calls."""
     if settings.demo_mode or settings.llm_provider == "fake":
         return FakeLLMClient.from_samples_dir(settings.samples_dir)
+    if settings.llm_provider == "none":
+        return UnavailableLLMClient(
+            "automatic detection is turned off on this server - pick the columns below"
+        )
     if settings.anthropic_api_key is None or not settings.anthropic_api_key.get_secret_value():
         return UnavailableLLMClient(
             "ANTHROPIC_API_KEY is not set - map the columns manually or configure a key"

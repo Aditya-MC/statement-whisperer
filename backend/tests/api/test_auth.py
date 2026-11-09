@@ -30,7 +30,9 @@ def test_status_and_first_signup_becomes_admin_and_claims_existing_data(
 ) -> None:
     db.add(Account(bank_name="Old", nickname="Pre multi-user", currency="INR"))  # no owner yet
     db.commit()
-    assert anon_client.get("/api/auth/status").json() == {"has_users": False, "demo_mode": False}
+    status = anon_client.get("/api/auth/status").json()
+    assert status["has_users"] is False and status["demo_mode"] is False
+    assert isinstance(status["ai_enabled"], bool)
 
     r = signup(anon_client, "  Me@Example.COM ")
     assert r.status_code == 201, r.text

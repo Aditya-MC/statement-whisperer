@@ -164,3 +164,13 @@ def generator() -> ModuleType:
 
 def truth_files() -> list[Path]:
     return sorted(SAMPLES_DIR.glob("*.truth.json"))
+
+
+@pytest.fixture(autouse=True)
+def _reset_rate_limits() -> Iterator[None]:
+    """Rate limits are process-wide; give every test a clean slate."""
+    from app.ratelimit import auth_limiter, upload_limiter
+
+    auth_limiter.reset()
+    upload_limiter.reset()
+    yield

@@ -24,7 +24,8 @@ class Settings(BaseSettings):
 
     database_url: str = f"sqlite:///{(BACKEND_DIR / 'ledger.db').as_posix()}"
 
-    llm_provider: Literal["anthropic", "fake"] = "anthropic"
+    #: "none" turns automatic detection off (manual column mapping, rule-based categories).
+    llm_provider: Literal["anthropic", "fake", "none"] = "anthropic"
     anthropic_api_key: SecretStr | None = None
     llm_model: str = "claude-opus-5-5"
     llm_effort: Literal["low", "medium", "high", "xhigh", "max"] = "medium"
