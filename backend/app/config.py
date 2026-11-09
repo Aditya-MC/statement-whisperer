@@ -32,6 +32,14 @@ class Settings(BaseSettings):
 
     max_upload_mb: int = Field(default=20, ge=1, le=200)
 
+    # --- accounts & sessions
+    #: Only this email may create the very first (admin) account. Leave unset for local use,
+    #: where the first sign-up becomes admin. Always set it on a public server.
+    admin_email: str | None = None
+    #: Send the session cookie over HTTPS only. Must be true when deployed.
+    cookie_secure: bool = False
+    session_days: int = Field(default=30, ge=1, le=365)
+
     demo_mode: bool = False
     samples_dir: Path = REPO_ROOT / "samples" / "synthetic"
     #: Built React app. Served at "/" when present (production/Docker); dev uses Vite on :5173.
