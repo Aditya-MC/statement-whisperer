@@ -9,12 +9,13 @@ from __future__ import annotations
 
 import csv
 import io
+import math
 from collections import Counter
 from dataclasses import dataclass
 from datetime import date, datetime, time
 from typing import Any
 
-import pandas as pd
+from openpyxl import load_workbook
 
 from app.ingestion.detect import FileType, UnsupportedFileError
 from app.services.masking import is_amount_like, is_date_like
@@ -101,10 +102,8 @@ def _cell_to_str(value: Any) -> str:
     decimals, so the inferred mapping for XLSX files is predictable (%Y-%m-%d, '.' decimal)."""
     if value is None:
         return ""
-    if isinstance(value, float) and pd.isna(value):
+    if isinstance(value, float) and math.isnan(value):
         return ""
-    if isinstance(value, pd.Timestamp):
-        value = value.to_pydatetime()
     if isinstance(value, datetime):
         return value.strftime("%Y-%m-%d") if value.time() == time(0) else value.isoformat(" ")
     if isinstance(value, date):
@@ -121,15 +120,24 @@ def _cell_to_str(value: Any) -> str:
 
 
 def _load_xlsx(data: bytes) -> RawTable:
+    """Read every sheet with openpyxl (pure Python) and keep the one with the most values."""
     try:
-        sheets = pd.read_excel(io.BytesIO(data), sheet_name=None, header=None, dtype=object)
+        wb = load_workbook(io.BytesIO(data), read_only=True, data_only=True)
     except Exception as exc:  # openpyxl raises many types; never echo their messages
         raise FileReadError("Could not read the spreadsheet") from exc
+    try:
+        sheets = [
+            [[_cell_to_str(v) for v in row] for row in ws.iter_rows(values_only=True)]
+            for ws in wb.worksheets
+        ]
+    except Exception as exc:
+        raise FileReadError("Could not read the spreadsheet") from exc
+    finally:
+        wb.close()
     if not sheets:
         raise FileReadError("The spreadsheet has no sheets")
     # Statements usually live on the first sheet; choose the largest non-empty one to be safe.
-    frame = max(sheets.values(), key=lambda df: int(df.notna().sum().sum()))
-    rows = [[_cell_to_str(v) for v in row] for row in frame.itertuples(index=False, name=None)]
+    rows = max(sheets, key=lambda rs: sum(1 for r in rs for c in r if c))
     return _pad(rows)
 
 
