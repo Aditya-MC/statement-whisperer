@@ -115,6 +115,19 @@ Money in from an expense-type merchant counts as a refund. A debit and an equal 
 
 Details are in [docs/privacy.md](docs/privacy.md).
 
+## Accounts and testers
+
+Statement Whisperer is multi-user, and every person gets a completely separate, private ledger.
+
+- **First sign-up = admin.** On a fresh install the first person to sign up becomes the admin and takes over any existing (pre-multi-user) data. On a public server, set `ADMIN_EMAIL` so only you can claim that spot.
+- **Invite-only after that.** The admin creates single-use invite codes on the **Account** page (click your email in the header). Testers sign up with a code.
+- **Isolation.** Accounts, imports, transactions, custom categories, your corrections and remembered AI answers belong to you alone. Asking for someone else's id returns "not found". Built-in categories and brand rules are shared, since they hold nothing personal. Transfers are only ever matched between your own accounts.
+- **Sessions:**
+  - A random token sits in an HttpOnly, SameSite=Lax cookie (Secure when `COOKIE_SECURE=true`). The server stores only its SHA-256.
+  - Passwords are hashed with argon2id.
+  - Write requests from other websites are rejected.
+- **Leaving:** **Delete account** on the Account page permanently removes the user and everything they own.
+
 ## Using it for free (no API key)
 
 The API key is optional. Leave `ANTHROPIC_API_KEY` empty and nothing ever leaves your machine:
@@ -182,7 +195,12 @@ All settings come from environment variables or `.env`. See [`.env.example`](.en
 | Method | Path | Purpose |
 |---|---|---|
 | `POST` | `/api/accounts` | Create an account (`last4` only) |
-| `GET` | `/api/accounts` | List accounts |
+| `GET` | `/api/accounts` | List your accounts |
+| `GET` | `/api/auth/status` | Public: whether anyone has signed up yet |
+| `POST` | `/api/auth/signup` | Create an account (`email`, `password`, `invite_code` unless first user) |
+| `POST` | `/api/auth/login` / `/api/auth/logout` | Start / end a session (cookie) |
+| `GET` / `DELETE` | `/api/auth/me` | Who am I / delete my account and all my data (password required) |
+| `POST` / `GET` | `/api/admin/invites` | Admin: create / list invite codes |
 | `GET` | `/api/categories` | The category tree (built-in and custom) |
 | `POST` | `/api/categories` | Add a category (`name`, `parent_id` for an existing group, or `kind` for a new group) |
 | `PATCH` | `/api/categories/{id}` | Rename a custom category |
