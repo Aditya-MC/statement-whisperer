@@ -48,7 +48,10 @@ switch ($Task) {
         Write-Host "Creating venv with: $base"
         Invoke-Expression "$base -m venv `"$Venv`""
         & $Py -m pip install --upgrade pip
-        & $Py -m pip install -e "$Backend[dev]"
+        # Windows Smart App Control blocks unsigned compiled extensions (.pyd). SQLAlchemy and
+        # mypy ship pure-Python fallbacks, so build them without their C/mypyc speed-ups.
+        $env:DISABLE_SQLALCHEMY_CEXT = '1'
+        & $Py -m pip install -e "$Backend[dev]" --no-binary "sqlalchemy,mypy"
         if (Get-Command npm -ErrorAction SilentlyContinue) {
             # npm cache location comes from frontend\.npmrc (D:\dev-cache\npm)
             Push-Location $Frontend
