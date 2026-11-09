@@ -128,7 +128,7 @@ function DeleteAccount({ onDeleted, notify }) {
   );
 }
 
-export default function AccountPage({ user, onSignOut, onDeleted, notify }) {
+export default function AccountPage({ user, onSignOut, onDeleted, onShowPrivacy, notify }) {
   return (
     <div className="flex flex-col gap-6">
       <section className="card flex flex-wrap items-center justify-between gap-3">
@@ -138,9 +138,18 @@ export default function AccountPage({ user, onSignOut, onDeleted, notify }) {
             {user.is_admin ? "Admin · " : ""}Member since {formatDate(user.created_at)}
           </p>
         </div>
-        <button type="button" className="btn-ghost" onClick={onSignOut}>
-          Sign out
-        </button>
+        <div className="flex flex-wrap gap-2">
+          {/* A plain link: the browser downloads the JSON with the session cookie. */}
+          <a className="btn-ghost" href="/api/auth/me/export" download>
+            Download my data
+          </a>
+          <button type="button" className="btn-ghost" onClick={onShowPrivacy}>
+            Privacy
+          </button>
+          <button type="button" className="btn-ghost" onClick={onSignOut}>
+            Sign out
+          </button>
+        </div>
       </section>
       {user.is_admin && <Invites notify={notify} />}
       <DeleteAccount onDeleted={onDeleted} notify={notify} />

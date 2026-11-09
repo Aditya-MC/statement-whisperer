@@ -22,6 +22,7 @@ from app.db import get_db
 from app.ingestion.detect import UnsupportedFileError
 from app.ingestion.pipeline import DuplicateFileError, FileMismatchError, ingest
 from app.models import Account, Import, ImportStatus, User
+from app.ratelimit import limit_upload
 from app.schemas.api import ErrorOut, ImportOut
 from app.schemas.mapping import ColumnMapping
 from app.services.llm import LLMClient
@@ -89,6 +90,7 @@ def _run_ingest(
     response_model=ImportOut,
     status_code=status.HTTP_201_CREATED,
     responses=_ERRORS,
+    dependencies=[Depends(limit_upload)],
 )
 async def create_import(
     account_id: int = Form(...),
@@ -107,7 +109,12 @@ async def create_import(
     return await run_in_threadpool(_run_ingest, db, llm, account, data, filename, override)
 
 
-@router.post("/imports/{import_id}/retry", response_model=ImportOut, responses=_ERRORS)
+@router.post(
+    "/imports/{import_id}/retry",
+    response_model=ImportOut,
+    responses=_ERRORS,
+    dependencies=[Depends(limit_upload)],
+)
 async def retry_import(
     import_id: int,
     file: UploadFile = File(..., description="The same statement file as the original upload."),

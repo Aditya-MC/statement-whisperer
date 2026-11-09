@@ -166,10 +166,17 @@ Caches stay on D: `dev.ps1` sets `PIP_CACHE_DIR=D:\dev-cache\pip` for its own pr
 
 Demo mode uses a separate database and an offline fake LLM, so it is safe for public demos and never touches your real ledger. Run `build` first to include the UI.
 
-### Docker (untested)
+### Hosting it for testers
 
-A `Dockerfile` (one image: UI build plus API) and `docker-compose.yml` are included but **have not been run yet**. Docker isn't installed on the development machine.
+**[docs/deploy.md](docs/deploy.md)** walks through deploying on **Render** (the app container, from `render.yaml`) with **Neon** (Postgres), both on free plans:
+- invite-only sign-up;
+- no AI, so no API costs;
+- HTTPS-only session cookies;
+- rate-limited login and uploads.
 
+The first real Docker build happens on Render, because Docker isn't installed on the development machine.
+
+Locally with Docker (if installed):
 ```powershell
 docker compose up --build                  # your ledger on http://localhost:8000, data in .\data
 docker compose --profile demo up --build   # synthetic demo on http://localhost:8001

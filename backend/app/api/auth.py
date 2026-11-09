@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import secrets
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
@@ -21,15 +22,21 @@ from app.auth import (
 )
 from app.config import get_settings
 from app.db import get_db
-from app.models import Invite, User
+from app.models import Account, Category, Import, Invite, MerchantRule, Transaction, User
 from app.models._types import utcnow
+from app.ratelimit import limit_auth
 from app.schemas.api import (
+    AccountOut,
     AuthStatusOut,
+    CategoryOut,
     DeleteMeIn,
+    ImportOut,
     InviteCreate,
     InviteOut,
     LoginIn,
+    MerchantRuleOut,
     SignupIn,
+    TransactionOut,
     UserOut,
 )
 
@@ -53,10 +60,18 @@ def _set_cookie(response: Response, token: str) -> None:
 def auth_status(db: Session = Depends(get_db)) -> dict[str, object]:
     """Public: whether anyone has signed up yet (the first sign-up creates the admin)."""
     has_users = (db.scalar(select(func.count()).select_from(User)) or 0) > 0
-    return {"has_users": has_users, "demo_mode": get_settings().demo_mode}
+    s = get_settings()
+    key = s.anthropic_api_key.get_secret_value() if s.anthropic_api_key else ""
+    ai = not s.demo_mode and s.llm_provider == "anthropic" and bool(key)
+    return {"has_users": has_users, "demo_mode": s.demo_mode, "ai_enabled": ai}
 
 
-@router.post("/auth/signup", response_model=UserOut, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/auth/signup",
+    response_model=UserOut,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(limit_auth)],
+)
 def signup(body: SignupIn, response: Response, db: Session = Depends(get_db)) -> User:
     try:
         email = normalize_email(body.email)
@@ -90,7 +105,7 @@ def signup(body: SignupIn, response: Response, db: Session = Depends(get_db)) ->
     return user
 
 
-@router.post("/auth/login", response_model=UserOut)
+@router.post("/auth/login", response_model=UserOut, dependencies=[Depends(limit_auth)])
 def login(body: LoginIn, response: Response, db: Session = Depends(get_db)) -> User:
     user = check_login(db, body.email, body.password)
     if user is None:
@@ -111,6 +126,41 @@ def logout(request: Request, response: Response, db: Session = Depends(get_db)) 
 @router.get("/auth/me", response_model=UserOut)
 def me(user: User = Depends(current_user)) -> User:
     return user
+
+
+@router.get("/auth/me/export")
+def export_my_data(user: User = Depends(current_user), db: Session = Depends(get_db)) -> Response:
+    """Everything stored about you, as one JSON file: accounts, imports, transactions, your
+    categories and rules. Statement files were never stored, so they aren't included."""
+    accounts = list(db.scalars(select(Account).where(Account.user_id == user.id)))
+    ids = [a.id for a in accounts]
+    imports = db.scalars(select(Import).where(Import.account_id.in_(ids)).order_by(Import.id))
+    txns = db.scalars(
+        select(Transaction)
+        .where(Transaction.account_id.in_(ids))
+        .order_by(Transaction.date, Transaction.id)
+    )
+    data = {
+        "exported_at": utcnow().isoformat(),
+        "user": {"email": user.email, "created_at": user.created_at.isoformat()},
+        "accounts": [AccountOut.model_validate(a).model_dump(mode="json") for a in accounts],
+        "imports": [ImportOut.model_validate(i).model_dump(mode="json") for i in imports],
+        "transactions": [TransactionOut.model_validate(t).model_dump(mode="json") for t in txns],
+        "custom_categories": [
+            CategoryOut.model_validate(c).model_dump(mode="json")
+            for c in db.scalars(select(Category).where(Category.user_id == user.id))
+        ],
+        "merchant_rules": [
+            MerchantRuleOut.model_validate(r).model_dump(mode="json")
+            for r in db.scalars(select(MerchantRule).where(MerchantRule.user_id == user.id))
+        ],
+    }
+    filename = f"statement-whisperer-export-{utcnow():%Y-%m-%d}.json"
+    return Response(
+        content=json.dumps(data, ensure_ascii=False, indent=1),
+        media_type="application/json",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @router.delete("/auth/me", status_code=status.HTTP_204_NO_CONTENT)

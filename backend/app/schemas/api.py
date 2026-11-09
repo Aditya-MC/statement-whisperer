@@ -38,6 +38,8 @@ class UserOut(BaseModel):
 class AuthStatusOut(BaseModel):
     has_users: bool
     demo_mode: bool
+    #: Whether anything is ever sent to an AI service from this server (shown in the privacy page).
+    ai_enabled: bool
 
 
 class InviteCreate(BaseModel):

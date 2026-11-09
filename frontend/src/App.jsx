@@ -2,6 +2,7 @@ import { Suspense, lazy, useCallback, useEffect, useState } from "react";
 import AccountPage from "./components/AccountPage.jsx";
 import AuthPage from "./components/AuthPage.jsx";
 import ImportPage from "./components/ImportPage.jsx";
+import PrivacyPage from "./components/PrivacyPage.jsx";
 import RulesPage from "./components/RulesPage.jsx";
 import ThemeToggle from "./components/ThemeToggle.jsx";
 import TransactionsPage from "./components/TransactionsPage.jsx";
@@ -17,6 +18,7 @@ const TABS = [
   { id: "import", label: "Import" },
   { id: "categories", label: "Categories" },
   { id: "account", label: "Account", hidden: true }, // opened from the email in the header
+  { id: "privacy", label: "Privacy", hidden: true },
 ];
 
 function tabFromHash() {
@@ -29,10 +31,12 @@ function tabFromHash() {
 export default function App() {
   // loading | signed_out | signed_in
   const [state, setState] = useState({ phase: "loading", user: null, firstRun: false, error: null });
+  const [aiEnabled, setAiEnabled] = useState(false);
 
   const check = useCallback(async () => {
     try {
       const status = await api.authStatus();
+      setAiEnabled(status.ai_enabled);
       try {
         const user = await api.me();
         setState({ phase: "signed_in", user, firstRun: false, error: null });
@@ -62,6 +66,7 @@ export default function App() {
         )}
         <AuthPage
           firstRun={state.firstRun}
+          aiEnabled={aiEnabled}
           onSignedIn={(user) => setState({ phase: "signed_in", user, firstRun: false, error: null })}
         />
       </>
@@ -75,10 +80,12 @@ export default function App() {
       setState({ phase: "signed_out", user: null, firstRun: false, error: null });
     }
   };
-  return <LedgerApp key={state.user.id} user={state.user} onSignOut={signOut} onDeleted={check} />;
+  return (
+    <LedgerApp key={state.user.id} user={state.user} aiEnabled={aiEnabled} onSignOut={signOut} onDeleted={check} />
+  );
 }
 
-function LedgerApp({ user, onSignOut, onDeleted }) {
+function LedgerApp({ user, aiEnabled, onSignOut, onDeleted }) {
   // The active tab lives in the URL hash so tabs can be bookmarked and survive reloads.
   const [tab, setTabState] = useState(tabFromHash);
   const setTab = useCallback((id) => {
@@ -213,8 +220,15 @@ function LedgerApp({ user, onSignOut, onDeleted }) {
           <RulesPage categories={categories} notify={notify} onCategoriesChanged={reloadCategories} />
         )}
         {tab === "account" && (
-          <AccountPage user={user} onSignOut={onSignOut} onDeleted={onDeleted} notify={notify} />
+          <AccountPage
+            user={user}
+            onSignOut={onSignOut}
+            onDeleted={onDeleted}
+            onShowPrivacy={() => setTab("privacy")}
+            notify={notify}
+          />
         )}
+        {tab === "privacy" && <PrivacyPage aiEnabled={aiEnabled} onBack={() => setTab("account")} />}
       </main>
 
       {toast && <Toast key={toast.at} message={toast.message} tone={toast.tone} onClose={closeToast} />}
