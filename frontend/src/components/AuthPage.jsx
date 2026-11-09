@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { api } from "../lib/api.js";
+import PrivacyPage from "./PrivacyPage.jsx";
 import ThemeToggle from "./ThemeToggle.jsx";
 import { Field } from "./ui.jsx";
 
@@ -7,7 +8,8 @@ import { Field } from "./ui.jsx";
  * Sign in / create account. `firstRun` (nobody has signed up yet) shows the one-time admin
  * set-up; afterwards new accounts need an invite code.
  */
-export default function AuthPage({ firstRun, onSignedIn }) {
+export default function AuthPage({ firstRun, aiEnabled, onSignedIn }) {
+  const [showPrivacy, setShowPrivacy] = useState(false);
   const [mode, setMode] = useState(firstRun ? "signup" : "login");
   const [form, setForm] = useState({ email: "", password: "", invite_code: "" });
   const [busy, setBusy] = useState(false);
@@ -28,6 +30,14 @@ export default function AuthPage({ firstRun, onSignedIn }) {
       setError(err.message);
       setBusy(false);
     }
+  }
+
+  if (showPrivacy) {
+    return (
+      <div className="min-h-screen px-4 py-10">
+        <PrivacyPage aiEnabled={aiEnabled} onBack={() => setShowPrivacy(false)} />
+      </div>
+    );
   }
 
   return (
@@ -91,7 +101,10 @@ export default function AuthPage({ firstRun, onSignedIn }) {
             </p>
           )}
           <p className="mt-8 text-center text-xs text-muted">
-            Your statements are processed in memory and never stored. Only you can see your data.
+            Your statements are processed in memory and never stored. Only you can see your data.{" "}
+            <button type="button" className="underline underline-offset-2 hover:text-ink" onClick={() => setShowPrivacy(true)}>
+              Privacy
+            </button>
           </p>
         </div>
       </main>
