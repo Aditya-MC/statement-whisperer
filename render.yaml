@@ -1,0 +1,25 @@
+# Render Blueprint: one Docker web service. The database is Neon (external), so its connection
+# string is entered by hand in the Render dashboard and never committed here.
+# Docs: https://render.com/docs/blueprint-spec
+services:
+  - type: web
+    name: statement-whisperer
+    runtime: docker
+    plan: free
+    region: singapore # keep close to the Neon database region
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: DATABASE_URL # Neon connection string (postgresql://...?sslmode=require)
+        sync: false # prompted for in the dashboard; secret
+      - key: ADMIN_EMAIL # only this email can create the first (admin) account
+        sync: false
+      - key: COOKIE_SECURE # session cookie over HTTPS only
+        value: "true"
+      - key: LLM_PROVIDER # no AI for testers: manual column mapping, rule-based categories
+        value: none
+      - key: DEMO_MODE
+        value: "false"
+      - key: LOG_LEVEL
+        value: INFO

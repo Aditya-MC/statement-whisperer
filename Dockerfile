@@ -1,8 +1,9 @@
-# Single image: builds the React app, then serves it and the API from FastAPI on :8000.
-# UNTESTED: Docker isn't installed on the dev machine yet (see README).
+# One image: builds the React app, then serves it and the API from FastAPI.
+# Used by Render (see render.yaml); also runs anywhere Docker does.
 
 # ---- 1. frontend build ------------------------------------------------------
-FROM node:22-alpine AS frontend
+# Debian-based (glibc) so Vite's native bundler binaries install cleanly.
+FROM node:22-slim AS frontend
 WORKDIR /app/frontend
 COPY frontend/package.json frontend/package-lock.json ./
 # frontend/.npmrc points the cache at a Windows path; it is excluded via .dockerignore.
@@ -15,6 +16,7 @@ FROM python:3.13-slim
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
+    PORT=8000 \
     DATABASE_URL=sqlite:////app/data/ledger.db \
     FRONTEND_DIST=/app/frontend/dist \
     SAMPLES_DIR=/app/samples/synthetic
@@ -32,5 +34,9 @@ RUN useradd --create-home --uid 1000 ledger && mkdir -p /app/data && chown -R le
 USER ledger
 
 EXPOSE 8000
-# Apply migrations on every start (idempotent), then serve.
-CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"]
+# 1. Apply database migrations (idempotent).
+# 2. Serve on the port the host assigns ($PORT on Render).
+#    --proxy-headers: behind Render's proxy, trust X-Forwarded-* so the real client IP
+#      (used by rate limits) and https scheme are seen.
+#    --no-access-log: request URLs can carry search terms (?q=...), so don't log them.
+CMD ["sh", "-c", "alembic upgrade head && exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT} --proxy-headers --forwarded-allow-ips='*' --no-access-log"]
