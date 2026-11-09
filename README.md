@@ -45,7 +45,7 @@ flowchart LR
 The full pipeline, data model and design notes are in [docs/architecture.md](docs/architecture.md).
 
 **Stack:**
-- Backend: FastAPI · SQLAlchemy 2 · Alembic · pandas/openpyxl · Anthropic API (structured output) · pytest
+- Backend: FastAPI · SQLAlchemy 2 · Alembic · openpyxl · Anthropic API (structured output) · pytest
 - Frontend: React 19 · Vite · Tailwind 4 · TanStack Table · Recharts · Vitest
 
 ## Supported layouts
@@ -142,6 +142,8 @@ copy .env.example .env            # set ANTHROPIC_API_KEY (optional, see Privacy
 For UI development, run `.\scripts\dev.ps1 run` and `.\scripts\dev.ps1 web` side by side, then open http://127.0.0.1:5173. Vite proxies `/api` to the backend.
 
 Caches stay on D: `dev.ps1` sets `PIP_CACHE_DIR=D:\dev-cache\pip` for its own process only, and `frontend/.npmrc` points npm's cache at `D:\dev-cache\npm`.
+
+**Windows Smart App Control:** it blocks unsigned compiled Python extensions (`.pyd`). The backend avoids them: XLSX is read with pure-Python openpyxl, and `dev.ps1 setup` installs SQLAlchemy and mypy without their compiled speed-ups. If you see *"An Application Control policy has blocked this file"*, re-run `.\scripts\dev.ps1 setup`.
 
 ### Demo mode (synthetic data only)
 
