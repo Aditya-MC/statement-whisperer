@@ -63,10 +63,11 @@
   --line: rgb(255 255 255 / 0.08);
   --axis: rgb(255 255 255 / 0.14);
   --axis-text: #8a91a8;
-  --rail: rgb(255 255 255 / 0.05);
-  --rail-ink: #f6efe4;
-  --rail-muted: #858ea8;
-  --rail-active: rgb(255 255 255 / 0.1);
+  /* The rail stays cream in dark mode: a light island on the night page, with navy icons. */
+  --rail: #f3eee4;
+  --rail-ink: #14213d;
+  --rail-muted: #6d7387;
+  --rail-active: rgb(20 33 61 / 0.1);
   --primary: #f26236;
   --on-primary: #ffffff;
   --primary-glow: 0 8px 28px -6px rgb(242 98 54 / 0.6);
