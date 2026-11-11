@@ -72,7 +72,7 @@ export default function CategoriesPanel({ categories, onChanged, notify }) {
     <section className="card">
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-base font-semibold">Categories</h2>
+          <h2 className="text-[17px] font-semibold tracking-tight">Categories</h2>
           <p className="mt-0.5 text-sm text-ink-2">
             Add your own categories; they appear everywhere, including the AI's list. Click a custom name to rename it.
           </p>
@@ -111,7 +111,7 @@ export default function CategoriesPanel({ categories, onChanged, notify }) {
                       {cat?.is_custom ? <EditableName category={cat} onRenamed={onChanged} notify={notify} /> : o.name}
                       {cat?.is_custom && (
                         <>
-                          <span className="rounded border border-line px-1 text-[10px] text-muted">custom</span>
+                          <span className="rounded-full bg-surface-2 px-1.5 text-[10px] text-muted">custom</span>
                           <button
                             type="button"
                             className="ml-auto text-xs text-muted opacity-0 group-hover:opacity-100 focus:opacity-100 hover:text-critical"

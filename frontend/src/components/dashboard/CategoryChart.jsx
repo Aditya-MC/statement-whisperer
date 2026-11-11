@@ -42,7 +42,7 @@ export default function CategoryChart({ rows, refunds, currency, onDrill }) {
                 />
                 <Bar
                   dataKey="value"
-                  radius={[0, 4, 4, 0]}
+                  radius={[0, 6, 6, 0]}
                   maxBarSize={18}
                   isAnimationActive={false}
                   onClick={(d) => open(d.payload ?? d)}

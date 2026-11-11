@@ -45,7 +45,7 @@ export default function RulesPage({ categories, notify, onCategoriesChanged }) {
 
       <section className="card">
         <div className="mb-4 flex flex-wrap items-center gap-3">
-          <h2 className="text-base font-semibold">Merchant rules</h2>
+          <h2 className="text-[17px] font-semibold tracking-tight">Merchant rules</h2>
           <select className="input" value={source} onChange={(e) => setSource(e.target.value)}>
             {SOURCES.map((s) => (
               <option key={s.value} value={s.value}>

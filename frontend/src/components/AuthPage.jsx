@@ -51,7 +51,7 @@ export default function AuthPage({ firstRun, aiEnabled, onSignedIn }) {
           <p className="mt-1 mb-8 text-sm text-ink-2">A private ledger that reads any bank's statement.</p>
 
           <form onSubmit={submit} className="card flex flex-col gap-4">
-            <h2 className="text-sm font-semibold">
+            <h2 className="text-[17px] font-semibold tracking-tight">
               {firstRun ? "Create the admin account" : signup ? "Create your account" : "Sign in"}
             </h2>
             {firstRun && (

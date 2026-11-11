@@ -5,6 +5,7 @@ import { SOURCE_LABELS, groupCategories } from "../lib/categories.js";
 import { amountTone, formatDate, formatMoney } from "../lib/format.js";
 import CategorySelect from "./CategorySelect.jsx";
 import NewCategoryDialog from "./NewCategoryDialog.jsx";
+import { IconSearch } from "./icons.jsx";
 import { Badge } from "./ui.jsx";
 
 const PAGE_SIZE = 50;
@@ -212,28 +213,14 @@ export default function TransactionsPage({ accounts, categories, initialAccountI
 
   return (
     <div className="flex flex-col gap-4">
-      <section className="card flex flex-wrap items-end gap-3">
-        <label className="flex flex-col gap-1 text-sm">
-          <span className="font-medium">Account</span>
-          <select
-            className="input"
-            value={filters.account_id ?? ""}
-            onChange={(e) => setFilter("account_id")(e.target.value === "" ? null : Number(e.target.value))}
-          >
-            <option value="">All accounts</option>
-            {accounts.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.nickname}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="flex flex-col gap-1 text-sm">
-          <span className="font-medium">Search</span>
+      <section className="flex flex-wrap items-center gap-2">
+        <label className="relative w-full sm:w-64">
+          <span className="sr-only">Search</span>
+          <IconSearch size={16} className="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-muted" />
           <input
-            className="input w-56"
+            className="input w-full pl-9"
             type="search"
-            placeholder="Merchant or narration"
+            placeholder="Search merchant or narration"
             value={search}
             onChange={(e) => {
               setSearch(e.target.value);
@@ -241,24 +228,38 @@ export default function TransactionsPage({ accounts, categories, initialAccountI
             }}
           />
         </label>
-        <label className="flex w-56 flex-col gap-1 text-sm">
-          <span className="font-medium">Category</span>
+        <select
+          aria-label="Account"
+          className="input"
+          value={filters.account_id ?? ""}
+          onChange={(e) => setFilter("account_id")(e.target.value === "" ? null : Number(e.target.value))}
+        >
+          <option value="">All accounts</option>
+          {accounts.map((a) => (
+            <option key={a.id} value={a.id}>
+              {a.nickname}
+            </option>
+          ))}
+        </select>
+        <label className="w-52">
+          <span className="sr-only">Category</span>
           <CategorySelect groups={groups} value={filters.category_id} onChange={setFilter("category_id")} allowAll />
         </label>
-        <label className="flex flex-col gap-1 text-sm">
-          <span className="font-medium">Transfers</span>
-          <select className="input" value={filters.transfers} onChange={(e) => setFilter("transfers")(e.target.value)}>
-            <option value="all">Include</option>
-            <option value="exclude">Exclude</option>
-            <option value="only">Only transfers</option>
-          </select>
-        </label>
-        <label className="flex items-center gap-2 pb-1.5 text-sm">
-          <input type="checkbox" checked={filters.uncategorized} onChange={(e) => setFilter("uncategorized")(e.target.checked)} />
+        <select aria-label="Transfers" className="input" value={filters.transfers} onChange={(e) => setFilter("transfers")(e.target.value)}>
+          <option value="all">Transfers included</option>
+          <option value="exclude">Transfers excluded</option>
+          <option value="only">Only transfers</option>
+        </select>
+        <label
+          className={`inline-flex cursor-pointer items-center gap-2 rounded-full border px-3.5 py-2 text-sm transition ${
+            filters.uncategorized ? "border-primary bg-primary text-on-primary" : "border-line bg-surface text-ink-2 hover:bg-surface-2"
+          }`}
+        >
+          <input type="checkbox" className="sr-only" checked={filters.uncategorized} onChange={(e) => setFilter("uncategorized")(e.target.checked)} />
           Uncategorized only
         </label>
         {(filters.date_from || filters.date_to) && (
-          <span className="mb-1 inline-flex items-center gap-2 rounded-full border border-line px-2.5 py-1 text-xs text-ink-2">
+          <span className="inline-flex items-center gap-2 rounded-full bg-surface-2 px-3 py-2 text-xs text-ink-2">
             {filters.date_from ? formatDate(filters.date_from) : "Start"} – {filters.date_to ? formatDate(filters.date_to) : "today"}
             <button
               type="button"
@@ -279,18 +280,18 @@ export default function TransactionsPage({ accounts, categories, initialAccountI
       </section>
 
       <section className="card overflow-x-auto p-0">
-        <table className="w-full table-fixed text-sm">
+        <table className="w-full min-w-[760px] table-fixed text-sm">
           <colgroup>
             <col className="w-28" />
             <col />
             <col className="w-36" />
             <col className="w-64" />
           </colgroup>
-          <thead className="border-b border-line text-left text-xs uppercase tracking-wide text-muted">
+          <thead className="border-b border-line text-left text-xs text-muted">
             {table.getHeaderGroups().map((group) => (
               <tr key={group.id}>
                 {group.headers.map((header) => (
-                  <th key={header.id} className="px-4 py-2.5 font-medium">
+                  <th key={header.id} className="px-5 py-3.5 font-medium">
                     {header.isPlaceholder ? null : <table.FlexRender header={header} />}
                   </th>
                 ))}
@@ -299,9 +300,9 @@ export default function TransactionsPage({ accounts, categories, initialAccountI
           </thead>
           <tbody>
             {table.getRowModel().rows.map((row) => (
-              <tr key={row.id} className="border-b border-line align-top last:border-0">
+              <tr key={row.id} className="border-b border-line align-top transition-colors last:border-0 hover:bg-surface-2/60">
                 {row.getAllCells().map((cell) => (
-                  <td key={cell.id} className="px-4 py-2.5">
+                  <td key={cell.id} className="px-5 py-3">
                     <table.FlexRender cell={cell} />
                   </td>
                 ))}

@@ -17,7 +17,7 @@ export default function ChartCard({ title, subtitle, legend, renderChart, render
     <section className={`card flex flex-col gap-4 ${className}`}>
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-sm font-semibold">{title}</h2>
+          <h2 className="text-[17px] font-semibold tracking-tight">{title}</h2>
           {subtitle && <p className="mt-0.5 text-xs text-muted">{subtitle}</p>}
         </div>
         <div className="flex items-center gap-4">

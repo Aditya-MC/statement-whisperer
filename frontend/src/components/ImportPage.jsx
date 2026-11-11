@@ -58,7 +58,7 @@ export default function ImportPage({ accounts, accountId, setAccountId, onAccoun
     <div className="grid gap-6 lg:grid-cols-[1fr_18rem]">
       <div className="flex flex-col gap-6">
         <section className="card">
-          <h2 className="mb-3 text-base font-semibold">Upload a statement</h2>
+          <h2 className="mb-4 text-[17px] font-semibold tracking-tight">Upload a statement</h2>
           {accounts.length === 0 || showNewAccount ? (
             <div className="mb-4">
               <p className="mb-3 text-sm text-ink-2">
@@ -96,7 +96,7 @@ export default function ImportPage({ accounts, accountId, setAccountId, onAccoun
                 <input
                   type="file"
                   accept=".csv,.tsv,.txt,.xlsx"
-                  className="input file:mr-3 file:rounded file:border-0 file:bg-surface-2 file:px-2 file:py-1"
+                  className="input file:mr-3 file:rounded-full file:border-0 file:bg-surface-2 file:px-3 file:py-1 file:text-ink"
                   onChange={(e) => {
                     setFile(e.target.files?.[0] ?? null);
                     setResult(null);
@@ -128,7 +128,7 @@ export default function ImportPage({ accounts, accountId, setAccountId, onAccoun
       </div>
 
       <aside className="card h-fit">
-        <h2 className="mb-3 text-sm font-semibold">Recent imports</h2>
+        <h2 className="mb-4 text-[17px] font-semibold tracking-tight">Recent imports</h2>
         {history.length === 0 ? (
           <p className="text-sm text-muted">None yet.</p>
         ) : (
@@ -141,7 +141,7 @@ export default function ImportPage({ accounts, accountId, setAccountId, onAccoun
                     setResult(h);
                     setResultFile(null);
                   }}
-                  className="flex w-full items-center justify-between gap-2 rounded px-1 py-0.5 text-left hover:bg-surface-2"
+                  className="flex w-full items-center justify-between gap-2 rounded-xl px-2 py-1 text-left hover:bg-surface-2"
                 >
                   <span className="truncate">
                     #{h.id} {h.date_from ? `${formatDate(h.date_from)} – ${formatDate(h.date_to)}` : h.file_type}

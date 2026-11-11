@@ -32,7 +32,7 @@ function Invites({ notify }) {
   return (
     <section className="card flex flex-col gap-4">
       <div>
-        <h2 className="text-sm font-semibold">Invite testers</h2>
+        <h2 className="text-[17px] font-semibold tracking-tight">Invite testers</h2>
         <p className="mt-0.5 text-sm text-ink-2">
           Each code works once. Send it with the app's link; they sign up with it and get their own private ledger.
         </p>
@@ -99,7 +99,7 @@ function DeleteAccount({ onDeleted, notify }) {
   return (
     <section className="card flex flex-col gap-3 border-critical/40">
       <div>
-        <h2 className="text-sm font-semibold">Delete account</h2>
+        <h2 className="text-[17px] font-semibold tracking-tight">Delete account</h2>
         <p className="mt-0.5 text-sm text-ink-2">
           Permanently deletes your account and everything in it: accounts, imports, transactions, categories and rules.
           This can't be undone.
@@ -133,7 +133,7 @@ export default function AccountPage({ user, onSignOut, onDeleted, onShowPrivacy,
     <div className="flex flex-col gap-6">
       <section className="card flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-sm font-semibold">{user.email}</h2>
+          <h2 className="text-[17px] font-semibold tracking-tight">{user.email}</h2>
           <p className="mt-0.5 text-xs text-muted">
             {user.is_admin ? "Admin · " : ""}Member since {formatDate(user.created_at)}
           </p>

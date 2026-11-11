@@ -23,8 +23,8 @@ export default function IncomeSpendingChart({ series, currency, granularity }) {
       renderChart={() => (
         <div className="h-64" role="img" aria-label="Income and spending per period; switch to Table for values">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: 0 }} barGap={2} barCategoryGap="30%">
-              <CartesianGrid vertical={false} stroke="var(--line)" />
+            <BarChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: 0 }} barGap={3} barCategoryGap="35%">
+              <CartesianGrid vertical={false} stroke="var(--line)" strokeDasharray="3 5" />
               <XAxis
                 dataKey="label"
                 tickLine={false}
@@ -40,11 +40,11 @@ export default function IncomeSpendingChart({ series, currency, granularity }) {
                 width={56}
               />
               <Tooltip
-                cursor={{ fill: "var(--surface-2)" }}
+                cursor={{ fill: "var(--surface-2)", radius: 12 }}
                 content={<ChartTooltip currency={currency} names={NAMES} />}
               />
-              <Bar dataKey="income" fill="var(--series-1)" radius={[4, 4, 0, 0]} maxBarSize={24} isAnimationActive={false} />
-              <Bar dataKey="spending" fill="var(--series-2)" radius={[4, 4, 0, 0]} maxBarSize={24} isAnimationActive={false} />
+              <Bar dataKey="income" fill="var(--series-1)" radius={[6, 6, 0, 0]} maxBarSize={18} isAnimationActive={false} />
+              <Bar dataKey="spending" fill="var(--series-2)" radius={[6, 6, 0, 0]} maxBarSize={18} isAnimationActive={false} />
             </BarChart>
           </ResponsiveContainer>
         </div>

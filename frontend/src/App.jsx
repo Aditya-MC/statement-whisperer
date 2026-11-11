@@ -6,18 +6,19 @@ import PrivacyPage from "./components/PrivacyPage.jsx";
 import RulesPage from "./components/RulesPage.jsx";
 import ThemeToggle from "./components/ThemeToggle.jsx";
 import TransactionsPage from "./components/TransactionsPage.jsx";
-import { Toast } from "./components/ui.jsx";
+import { IconDashboard, IconList, IconPlus, IconTag, IconUpload } from "./components/icons.jsx";
+import { PageHeader, Toast } from "./components/ui.jsx";
 import { api, setUnauthorizedHandler } from "./lib/api.js";
 
 // Charts (Recharts) are only needed on the dashboard, so that code loads on demand.
 const DashboardPage = lazy(() => import("./components/dashboard/DashboardPage.jsx"));
 
 const TABS = [
-  { id: "dashboard", label: "Dashboard" },
-  { id: "transactions", label: "Transactions" },
-  { id: "import", label: "Import" },
-  { id: "categories", label: "Categories" },
-  { id: "account", label: "Account", hidden: true }, // opened from the email in the header
+  { id: "dashboard", label: "Overview", icon: IconDashboard, subtitle: "Where your money came from and where it went." },
+  { id: "transactions", label: "Transactions", icon: IconList, subtitle: "Every imported row, searchable and editable." },
+  { id: "import", label: "Import", icon: IconUpload, subtitle: "Add a bank statement. The file is read in memory and never stored." },
+  { id: "categories", label: "Categories", icon: IconTag, subtitle: "Your categories and the merchant rules that fill them." },
+  { id: "account", label: "Account", hidden: true, subtitle: "Your login, invites and data." }, // opened from the avatar
   { id: "privacy", label: "Privacy", hidden: true },
 ];
 
@@ -133,54 +134,38 @@ function LedgerApp({ user, aiEnabled, onSignOut, onDeleted }) {
     [setTab],
   );
 
+  const current = TABS.find((t) => t.id === tab);
+  const go = (id) => {
+    if (id === "transactions") setDrill(null);
+    setTab(id);
+  };
+  const initial = (user.email?.[0] ?? "?").toUpperCase();
+
   return (
     <div className="min-h-screen">
-      <header className="sticky top-0 z-40 border-b border-line bg-page/90 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-8 gap-y-2 px-4 py-3">
-          <h1 className="text-[15px] font-semibold tracking-tight">Statement Whisperer</h1>
-          <nav className="flex gap-1" aria-label="Sections">
-            {TABS.filter((t) => !t.hidden).map((t) => (
-              <button
-                key={t.id}
-                type="button"
-                onClick={() => {
-                  if (t.id === "transactions") setDrill(null);
-                  setTab(t.id);
-                }}
-                aria-current={tab === t.id ? "page" : undefined}
-                className={`rounded-md px-2.5 py-1 text-sm transition-colors ${
-                  tab === t.id ? "bg-surface-2 font-medium text-ink" : "text-muted hover:text-ink"
-                }`}
-              >
-                {t.label}
-              </button>
-            ))}
-          </nav>
-          <div className="ml-auto flex items-center gap-3">
+      <NavRail tab={tab} go={go} initial={initial} email={user.email} />
+      <MobileTopBar initial={initial} onAccount={() => setTab("account")} />
+      <BottomTabs tab={tab} go={go} />
+
+      <main className="mx-auto flex max-w-7xl flex-col gap-6 px-4 pt-4 pb-32 md:pt-10 md:pr-8 md:pb-12 md:pl-[120px]">
+        {current?.id !== "privacy" && (
+          <PageHeader title={current?.label} subtitle={current?.subtitle}>
             {health?.demo_mode && (
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-line px-2.5 py-0.5 text-xs text-ink-2">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-surface px-3 py-1.5 text-xs text-ink-2 shadow-soft">
                 <span aria-hidden="true" className="size-2 rounded-full bg-[#fab219]" />
                 Demo · synthetic data
               </span>
             )}
-            {!health?.demo_mode && (
-              <button
-                type="button"
-                className="max-w-48 truncate text-xs text-muted hover:text-ink"
-                title="Account"
-                onClick={() => setTab("account")}
-              >
-                {user.email}
+            {tab !== "import" && tab !== "account" && (
+              <button type="button" className="btn-primary" onClick={() => setTab("import")}>
+                <IconPlus size={16} />
+                Import
               </button>
             )}
-            <ThemeToggle />
-          </div>
-        </div>
-      </header>
-
-      <main className="mx-auto max-w-6xl px-4 py-8">
+          </PageHeader>
+        )}
         {loadError && (
-          <div className="card mb-4 border-critical text-sm text-critical">
+          <div className="card text-sm text-critical">
             Could not reach the API: {loadError}. Is the backend running on port 8000?
           </div>
         )}
@@ -233,5 +218,103 @@ function LedgerApp({ user, aiEnabled, onSignOut, onDeleted }) {
 
       {toast && <Toast key={toast.at} message={toast.message} tone={toast.tone} onClose={closeToast} />}
     </div>
+  );
+}
+
+const NAV_TABS = TABS.filter((t) => !t.hidden);
+
+/** App mark: cream disc on the navy rail (`onRail`), navy disc on the page. */
+function Logo({ onRail = true }) {
+  return (
+    <span
+      aria-hidden="true"
+      className={`grid place-items-center rounded-full font-bold tracking-tight ${
+        onRail ? "size-11 bg-rail-ink text-[17px] text-rail" : "size-9 bg-primary text-[15px] text-on-primary"
+      }`}
+    >
+      S
+    </span>
+  );
+}
+
+/** Desktop: floating navy rail with round icon buttons; labels appear as hover tooltips. */
+function NavRail({ tab, go, initial, email }) {
+  const item = (active) =>
+    `group relative grid size-11 place-items-center rounded-full transition ${
+      active ? "bg-rail-active text-rail-ink" : "text-rail-muted hover:bg-rail-active/60 hover:text-rail-ink"
+    }`;
+  const tip = (label) => (
+    <span className="pointer-events-none absolute left-full ml-3 rounded-full bg-primary px-3 py-1 text-xs font-medium whitespace-nowrap text-on-primary opacity-0 shadow-soft transition group-hover:opacity-100 group-focus-visible:opacity-100">
+      {label}
+    </span>
+  );
+  return (
+    <aside className="fixed top-4 bottom-4 left-4 z-40 hidden w-[76px] flex-col items-center rounded-[36px] bg-rail py-4 shadow-soft md:flex">
+      <Logo />
+      <nav className="mt-8 flex flex-col gap-2" aria-label="Sections">
+        {NAV_TABS.map((t) => (
+          <button key={t.id} type="button" aria-label={t.label} aria-current={tab === t.id ? "page" : undefined} className={item(tab === t.id)} onClick={() => go(t.id)}>
+            <t.icon />
+            {tip(t.label)}
+          </button>
+        ))}
+      </nav>
+      <div className="mt-auto flex flex-col items-center gap-3">
+        <ThemeToggle variant="cycle" className={item(false)} />
+        <button
+          type="button"
+          aria-label="Account"
+          title={email}
+          onClick={() => go("account")}
+          className={`grid size-11 place-items-center rounded-full text-sm font-semibold transition ${
+            tab === "account" ? "bg-rail-ink text-rail" : "bg-rail-active text-rail-ink hover:bg-rail-ink hover:text-rail"
+          }`}
+        >
+          {initial}
+        </button>
+      </div>
+    </aside>
+  );
+}
+
+/** Phone: app name with theme + account at the top… */
+function MobileTopBar({ initial, onAccount }) {
+  return (
+    <div className="flex items-center gap-3 px-4 pt-4 md:hidden">
+      <Logo onRail={false} />
+      <span className="text-[15px] font-semibold tracking-tight">Statement Whisperer</span>
+      <div className="ml-auto flex items-center gap-2">
+        <ThemeToggle variant="cycle" className="btn-icon" />
+        <button type="button" aria-label="Account" onClick={onAccount} className="grid size-10 place-items-center rounded-full bg-primary text-sm font-semibold text-on-primary">
+          {initial}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** …and an iOS-style floating tab bar at the bottom. */
+function BottomTabs({ tab, go }) {
+  return (
+    <nav
+      aria-label="Sections"
+      className="fixed inset-x-4 z-40 flex justify-around rounded-full bg-rail p-1.5 shadow-soft md:hidden"
+      style={{ bottom: "calc(1rem + env(safe-area-inset-bottom, 0px))" }}
+    >
+      {NAV_TABS.map((t) => (
+        <button
+          key={t.id}
+          type="button"
+          aria-current={tab === t.id ? "page" : undefined}
+          onClick={() => go(t.id)}
+          className={`flex flex-1 flex-col items-center gap-0.5 rounded-full py-1.5 text-[10px] font-medium transition ${
+            tab === t.id ? "bg-rail-active text-rail-ink" : "text-rail-muted"
+          }`}
+        >
+          <t.icon size={20} />
+          {t.label}
+        </button>
+      ))}
+    </nav>
   );
 }

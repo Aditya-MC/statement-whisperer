@@ -67,7 +67,7 @@ export default function MappingReview({ imp, file, accountCurrency, onResolved }
 
   return (
     <section className="card">
-      <h2 className="text-base font-semibold">Review column mapping</h2>
+      <h2 className="text-[17px] font-semibold tracking-tight">Review column mapping</h2>
       <p className="mb-4 text-sm text-ink-2">
         Tell us which column holds what. Nothing is saved until the statement passes validation.
       </p>
@@ -86,7 +86,7 @@ export default function MappingReview({ imp, file, accountCurrency, onResolved }
             {columns.map((c, i) => (
               <label
                 key={i}
-                className={`cursor-pointer rounded-md border px-2 py-1 text-sm ${
+                className={`cursor-pointer rounded-full border px-3 py-1 text-sm transition ${
                   m.description_columns?.includes(i) ? "border-ink bg-surface-2" : "border-line"
                 }`}
               >

@@ -22,7 +22,7 @@ function IssueList({ title, issues, counts, tone }) {
   return (
     <div className="mt-4">
       <h3 className={`mb-1 text-sm font-semibold ${color}`}>{title}</h3>
-      <ul className="max-h-56 overflow-auto rounded border border-line text-sm">
+      <ul className="max-h-56 overflow-auto rounded-2xl border border-line text-sm">
         {issues.map((i, idx) => (
           <li key={idx} className="flex gap-3 border-b border-line px-3 py-1.5 last:border-0">
             <span className="w-16 shrink-0 text-muted tabular-nums">{i.row ? `row ${i.row}` : ""}</span>
@@ -47,7 +47,7 @@ export default function ImportResult({ imp, onViewTransactions }) {
   return (
     <section className="card" aria-live="polite">
       <div className="mb-3 flex flex-wrap items-center gap-3">
-        <h2 className="text-base font-semibold">Import #{imp.id}</h2>
+        <h2 className="text-[17px] font-semibold tracking-tight">Import #{imp.id}</h2>
         <StatusPill status={imp.status} />
         {imp.mapping_source && <span className="text-xs text-muted">{MAPPING_SOURCE_TEXT[imp.mapping_source] ?? ""}</span>}
         {imp.status === "completed" && (
