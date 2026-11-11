@@ -13,10 +13,27 @@ const SERIES = [
 // With only a few periods every point gets a dot, so short ranges don't read as bare lines.
 const DOTS_UP_TO = 12;
 
-/** Last point of each line: an emphasized end-dot with a 2px surface ring. */
-function EndDot({ cx, cy, index, count, color }) {
-  if (index !== count - 1 || cx == null || cy == null) return null;
-  return <circle cx={cx} cy={cy} r={5} fill={color} stroke="var(--surface-solid)" strokeWidth={2} />;
+/** Square pixel marker (>= 8px) with a 2px surface ring, centred on the point. */
+function PixelDot({ cx, cy, size = 8, color }) {
+  if (cx == null || cy == null) return null;
+  return (
+    <rect
+      x={cx - size / 2}
+      y={cy - size / 2}
+      width={size}
+      height={size}
+      fill={color}
+      stroke="var(--surface-solid)"
+      strokeWidth={2}
+      shapeRendering="crispEdges"
+    />
+  );
+}
+
+/** Last point of each line: an emphasized end marker. */
+function EndDot({ index, count, ...p }) {
+  if (index !== count - 1) return null;
+  return <PixelDot {...p} size={10} />;
 }
 
 /**
@@ -71,7 +88,7 @@ export default function IncomeSpendingChart({ series, currency, granularity }) {
               {SERIES.map((s) => (
                 <Area
                   key={s.key}
-                  type="monotone"
+                  type="linear"
                   dataKey={s.key}
                   stroke={s.color}
                   strokeWidth={2}
@@ -80,10 +97,10 @@ export default function IncomeSpendingChart({ series, currency, granularity }) {
                   fill={`url(#wash-${s.key})`}
                   dot={
                     showDots
-                      ? { r: 4, fill: s.color, stroke: "var(--surface-solid)", strokeWidth: 2 }
-                      : (p) => <EndDot key={p.index} {...p} count={data.length} color={s.color} />
+                      ? (p) => <PixelDot key={p.index} cx={p.cx} cy={p.cy} color={s.color} />
+                      : (p) => <EndDot key={p.index} cx={p.cx} cy={p.cy} index={p.index} count={data.length} color={s.color} />
                   }
-                  activeDot={{ r: 6, fill: s.color, stroke: "var(--surface-solid)", strokeWidth: 2 }}
+                  activeDot={(p) => <PixelDot key={`a${p.index}`} cx={p.cx} cy={p.cy} size={12} color={s.color} />}
                   isAnimationActive={false}
                 />
               ))}

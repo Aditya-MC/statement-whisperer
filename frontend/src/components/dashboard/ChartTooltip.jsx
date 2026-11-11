@@ -7,7 +7,7 @@ import { formatMoney } from "../../lib/format.js";
 export default function ChartTooltip({ active, payload, label, currency, names = {} }) {
   if (!active || !payload?.length) return null;
   return (
-    <div className="min-w-36 rounded-2xl border border-line bg-surface-solid px-3.5 py-2.5 text-xs shadow-soft">
+    <div className="pop-in min-w-36 border-2 border-(--glass-border) bg-surface-solid px-3.5 py-2.5 text-xs">
       {label && <div className="mb-1.5 font-medium text-ink-2">{label}</div>}
       <ul className="flex flex-col gap-1">
         {payload.map((p) => (

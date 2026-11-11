@@ -46,17 +46,18 @@ export default function AuthPage({ firstRun, aiEnabled, onSignedIn }) {
         <span
           aria-hidden="true"
           style={{ boxShadow: "var(--primary-glow)" }}
-          className="grid size-9 place-items-center rounded-full bg-primary text-[15px] font-bold text-on-primary"
+          className="grid size-9 place-items-center bg-primary font-pixel text-[15px] font-bold text-on-primary"
         >
           S
         </span>
-        <span className="text-[15px] font-semibold tracking-tight">Statement Whisperer</span>
+        <span className="font-pixel text-[15px] uppercase">Statement Whisperer</span>
         <ThemeToggle className="ml-auto" />
       </header>
       <main className="mx-auto grid w-full max-w-6xl flex-1 items-center gap-10 px-4 pt-6 pb-16 md:px-8 lg:grid-cols-[1.15fr_1fr] lg:gap-16">
         <section className="flex flex-col gap-6">
-          <h1 className="text-5xl leading-[1.02] font-bold tracking-[-0.04em] text-balance md:text-7xl">
-            Your statements, finally making sense.
+          <p className="font-pixel text-xs tracking-widest text-muted uppercase">Welcome · Please insert statement</p>
+          <h1 className="font-pixel text-4xl leading-[1.05] font-bold text-balance uppercase md:text-6xl">
+            Your statements, finally making sense<span aria-hidden="true" className="cursor-blink">_</span>
           </h1>
           <p className="max-w-md text-[17px] leading-relaxed text-ink-2">
             Drop in a CSV or Excel export from any bank. Every row is checked against the bank's own running
@@ -64,7 +65,7 @@ export default function AuthPage({ firstRun, aiEnabled, onSignedIn }) {
           </p>
           <ul className="flex flex-wrap gap-2 text-xs text-ink-2">
             {["Any bank's layout", "Balances verified row by row", "Files never stored"].map((t) => (
-              <li key={t} className="glass rounded-full px-3 py-1.5">
+              <li key={t} className="border-2 border-line px-3 py-1.5 font-semibold uppercase">
                 {t}
               </li>
             ))}

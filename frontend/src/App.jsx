@@ -223,13 +223,13 @@ function LedgerApp({ user, aiEnabled, onSignOut, onDeleted }) {
 
 const NAV_TABS = TABS.filter((t) => !t.hidden);
 
-/** App mark: an ember disc that glows like the primary buttons. Larger on the rail. */
+/** App mark: a pixel "S" key with a hard pixel shadow. Larger on the rail. */
 function Logo({ onRail = true }) {
   return (
     <span
       aria-hidden="true"
       style={{ boxShadow: "var(--primary-glow)" }}
-      className={`grid place-items-center rounded-full bg-primary font-bold tracking-tight text-on-primary ${
+      className={`grid place-items-center bg-primary font-pixel font-bold text-on-primary ${
         onRail ? "size-11 text-[17px]" : "size-9 text-[15px]"
       }`}
     >
@@ -241,11 +241,11 @@ function Logo({ onRail = true }) {
 /** Desktop: floating navy rail with round icon buttons; labels appear as hover tooltips. */
 function NavRail({ tab, go, initial, email }) {
   const item = (active) =>
-    `group relative grid size-11 place-items-center rounded-full transition ${
-      active ? "bg-rail-active text-rail-ink" : "text-rail-muted hover:bg-rail-active/60 hover:text-rail-ink"
+    `group relative grid size-11 place-items-center border-2 transition duration-200 ${
+      active ? "border-rail-ink bg-rail-ink text-rail" : "border-transparent text-rail-muted hover:border-rail-muted hover:text-rail-ink"
     }`;
   const tip = (label) => (
-    <span className="pointer-events-none absolute left-full ml-3 rounded-full bg-primary px-3 py-1 text-xs font-medium whitespace-nowrap text-on-primary opacity-0 shadow-soft transition group-hover:opacity-100 group-focus-visible:opacity-100">
+    <span className="pointer-events-none absolute left-full ml-3 -translate-x-1 border-2 border-(--glass-border) bg-surface-solid px-3 py-1 font-pixel text-xs whitespace-nowrap text-ink uppercase opacity-0 transition duration-200 group-hover:translate-x-0 group-hover:opacity-100 group-focus-visible:translate-x-0 group-focus-visible:opacity-100">
       {label}
     </span>
   );

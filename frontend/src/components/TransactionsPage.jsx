@@ -216,11 +216,11 @@ export default function TransactionsPage({ accounts, categories, initialAccountI
       <section className="flex flex-wrap items-center gap-2">
         <label className="relative w-full sm:w-64">
           <span className="sr-only">Search</span>
-          <IconSearch size={16} className="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-muted" />
+          <IconSearch size={16} className="pointer-events-none absolute top-1/2 left-3.5 z-10 -translate-y-1/2 text-muted" />
           <input
             className="input w-full pl-9"
             type="search"
-            placeholder="Search merchant or narration"
+            placeholder="Search merchants"
             value={search}
             onChange={(e) => {
               setSearch(e.target.value);

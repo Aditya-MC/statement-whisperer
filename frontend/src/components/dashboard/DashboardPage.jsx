@@ -18,7 +18,7 @@ function StatCard({ label, value, icon, tone, hint }) {
         <span className="text-sm font-medium text-ink-2">{label}</span>
         <IconChip>{icon}</IconChip>
       </div>
-      <span className={`truncate text-[30px] leading-none font-bold tracking-[-0.02em] tabular-nums ${color}`}>{value}</span>
+      <span className={`truncate font-pixel text-[28px] leading-none tabular-nums ${color}`}>{value}</span>
       <span className="truncate text-xs text-muted">{hint ?? " "}</span>
     </section>
   );
