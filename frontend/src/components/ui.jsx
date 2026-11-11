@@ -7,7 +7,7 @@ export function Toast({ message, tone = "info", onClose }) {
   }, [onClose]);
   return (
     <div role="status" className="fixed inset-x-0 bottom-24 z-50 flex justify-center px-4 md:bottom-6">
-      <div className="flex max-w-lg items-start gap-3 rounded-2xl bg-primary px-4 py-3 text-sm text-on-primary shadow-soft">
+      <div className="flex max-w-lg items-start gap-3 rounded-2xl border border-line bg-surface-solid px-4 py-3 text-sm text-ink shadow-soft">
         {tone !== "info" && <Dot tone={tone === "error" ? "critical" : "good"} />}
         <span>{message}</span>
         <button type="button" onClick={onClose} className="opacity-60 hover:opacity-100" aria-label="Dismiss">
@@ -88,8 +88,8 @@ export function PageHeader({ title, subtitle, children }) {
   return (
     <header className="flex flex-wrap items-end justify-between gap-4">
       <div className="min-w-0">
-        <h1 className="text-3xl font-semibold tracking-tight text-balance">{title}</h1>
-        {subtitle && <p className="mt-1 text-[15px] text-ink-2">{subtitle}</p>}
+        <h1 className="text-4xl font-bold tracking-[-0.03em] text-balance md:text-5xl">{title}</h1>
+        {subtitle && <p className="mt-2 text-[15px] text-ink-2">{subtitle}</p>}
       </div>
       {children && <div className="flex flex-wrap items-center gap-2">{children}</div>}
     </header>

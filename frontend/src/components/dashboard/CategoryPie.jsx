@@ -7,7 +7,7 @@ function PieTooltip({ active, payload, currency }) {
   if (!active || !payload?.length) return null;
   const d = payload[0].payload;
   return (
-    <div className="rounded-2xl border border-line bg-surface px-3.5 py-2.5 text-xs shadow-soft">
+    <div className="rounded-2xl border border-line bg-surface-solid px-3.5 py-2.5 text-xs shadow-soft">
       <div className="flex items-center gap-2">
         <span aria-hidden="true" className="h-0.5 w-3 rounded-full" style={{ background: sliceColor(d.slot) }} />
         <span className="font-semibold tabular-nums text-ink">{formatMoney(d.amount, currency)}</span>
@@ -69,7 +69,7 @@ export default function CategoryPie({ slices, total, currency, onDrill }) {
                     outerRadius="100%"
                     startAngle={90}
                     endAngle={-270}
-                    stroke="var(--surface)"
+                    stroke="var(--surface-solid)"
                     strokeWidth={2}
                     isAnimationActive={false}
                     onClick={(d) => open(d.payload ?? d)}

@@ -7,14 +7,15 @@ describe("theme", () => {
     return { getItem: (k) => data[k] ?? null, setItem: (k, v) => (data[k] = v), data };
   }
 
-  it("defaults to system and ignores junk", () => {
-    expect(readThemePref(fakeStorage())).toBe("system");
-    expect(readThemePref(fakeStorage({ "sw-theme": "purple" }))).toBe("system");
+  it("defaults to dark and ignores junk", () => {
+    expect(readThemePref(fakeStorage())).toBe("dark");
+    expect(readThemePref(fakeStorage({ "sw-theme": "purple" }))).toBe("dark");
+    expect(readThemePref(fakeStorage({ "sw-theme": "system" }))).toBe("system");
   });
 
   it("survives blocked storage", () => {
     const blocked = { getItem: () => { throw new Error("blocked"); }, setItem: () => { throw new Error("blocked"); } };
-    expect(readThemePref(blocked)).toBe("system");
+    expect(readThemePref(blocked)).toBe("dark");
     expect(() => writeThemePref("dark", blocked)).not.toThrow();
   });
 

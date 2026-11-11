@@ -223,13 +223,14 @@ function LedgerApp({ user, aiEnabled, onSignOut, onDeleted }) {
 
 const NAV_TABS = TABS.filter((t) => !t.hidden);
 
-/** App mark: cream disc on the navy rail (`onRail`), navy disc on the page. */
+/** App mark: an ember disc that glows like the primary buttons. Larger on the rail. */
 function Logo({ onRail = true }) {
   return (
     <span
       aria-hidden="true"
-      className={`grid place-items-center rounded-full font-bold tracking-tight ${
-        onRail ? "size-11 bg-rail-ink text-[17px] text-rail" : "size-9 bg-primary text-[15px] text-on-primary"
+      style={{ boxShadow: "var(--primary-glow)" }}
+      className={`grid place-items-center rounded-full bg-primary font-bold tracking-tight text-on-primary ${
+        onRail ? "size-11 text-[17px]" : "size-9 text-[15px]"
       }`}
     >
       S
@@ -249,7 +250,7 @@ function NavRail({ tab, go, initial, email }) {
     </span>
   );
   return (
-    <aside className="fixed top-4 bottom-4 left-4 z-40 hidden w-[76px] flex-col items-center rounded-[36px] bg-rail py-4 shadow-soft md:flex">
+    <aside className="fixed top-4 bottom-4 left-4 z-40 hidden w-[76px] flex-col items-center rounded-[36px] border border-(--glass-border) bg-rail py-4 shadow-soft backdrop-blur-2xl md:flex">
       <Logo />
       <nav className="mt-8 flex flex-col gap-2" aria-label="Sections">
         {NAV_TABS.map((t) => (
@@ -298,7 +299,7 @@ function BottomTabs({ tab, go }) {
   return (
     <nav
       aria-label="Sections"
-      className="fixed inset-x-4 z-40 flex justify-around rounded-full bg-rail p-1.5 shadow-soft md:hidden"
+      className="fixed inset-x-4 z-40 flex justify-around rounded-full border border-(--glass-border) bg-rail p-1.5 shadow-soft backdrop-blur-2xl md:hidden"
       style={{ bottom: "calc(1rem + env(safe-area-inset-bottom, 0px))" }}
     >
       {NAV_TABS.map((t) => (

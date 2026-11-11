@@ -3,14 +3,15 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="color-scheme" content="light dark" />
+    <meta name="color-scheme" content="dark light" />
+    <meta name="theme-color" content="#070b16" />
     <title>Statement Whisperer</title>
     <script>
       // Apply the saved theme before first paint so there's no light/dark flash.
       (function () {
-        var pref = "system";
+        var pref = "dark"; // keep in step with DEFAULT_THEME in src/lib/theme.js
         try {
-          pref = localStorage.getItem("sw-theme") || "system";
+          pref = localStorage.getItem("sw-theme") || "dark";
         } catch (e) {}
         var dark = pref === "dark" || (pref !== "light" && matchMedia("(prefers-color-scheme: dark)").matches);
         var root = document.documentElement;

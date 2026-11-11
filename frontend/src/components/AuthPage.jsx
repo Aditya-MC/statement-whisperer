@@ -42,15 +42,37 @@ export default function AuthPage({ firstRun, aiEnabled, onSignedIn }) {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="flex justify-end px-4 py-3">
-        <ThemeToggle />
+      <header className="mx-auto flex w-full max-w-6xl items-center gap-3 px-4 py-5 md:px-8">
+        <span
+          aria-hidden="true"
+          style={{ boxShadow: "var(--primary-glow)" }}
+          className="grid size-9 place-items-center rounded-full bg-primary text-[15px] font-bold text-on-primary"
+        >
+          S
+        </span>
+        <span className="text-[15px] font-semibold tracking-tight">Statement Whisperer</span>
+        <ThemeToggle className="ml-auto" />
       </header>
-      <main className="flex flex-1 items-start justify-center px-4 pt-[10vh]">
-        <div className="w-full max-w-sm">
-          <h1 className="text-2xl font-semibold tracking-tight">Statement Whisperer</h1>
-          <p className="mt-1 mb-8 text-sm text-ink-2">A private ledger that reads any bank's statement.</p>
+      <main className="mx-auto grid w-full max-w-6xl flex-1 items-center gap-10 px-4 pt-6 pb-16 md:px-8 lg:grid-cols-[1.15fr_1fr] lg:gap-16">
+        <section className="flex flex-col gap-6">
+          <h1 className="text-5xl leading-[1.02] font-bold tracking-[-0.04em] text-balance md:text-7xl">
+            Your statements, finally making sense.
+          </h1>
+          <p className="max-w-md text-[17px] leading-relaxed text-ink-2">
+            Drop in a CSV or Excel export from any bank. Every row is checked against the bank's own running
+            balance, sorted into categories and turned into a clear picture of where your money goes.
+          </p>
+          <ul className="flex flex-wrap gap-2 text-xs text-ink-2">
+            {["Any bank's layout", "Balances verified row by row", "Files never stored"].map((t) => (
+              <li key={t} className="glass rounded-full px-3 py-1.5">
+                {t}
+              </li>
+            ))}
+          </ul>
+        </section>
 
-          <form onSubmit={submit} className="card flex flex-col gap-4">
+        <div className="w-full max-w-sm justify-self-center lg:justify-self-end">
+          <form onSubmit={submit} className="card flex flex-col gap-4 p-7">
             <h2 className="text-[17px] font-semibold tracking-tight">
               {firstRun ? "Create the admin account" : signup ? "Create your account" : "Sign in"}
             </h2>

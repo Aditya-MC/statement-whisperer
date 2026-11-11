@@ -4,30 +4,39 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 /*
- * Design tokens: navy + cream, soft and quiet (iOS / Notion feel).
- * Light: cream page, warm-white cards, navy ink and navy navigation rail.
- * Dark: deep navy page, navy cards, cream ink. Dark values are their own steps, not an inversion.
- * Chart series are the validated reference palette, re-checked against both card surfaces
- * (dataviz validator: light #fffcf6, dark #131c30).
+ * Design tokens: "night glow". Deep navy page lit by a warm ember glow, frosted-glass cards,
+ * cream type and one ember-orange accent for primary actions.
+ * Dark is the main look (and the default). Light is the calmer version: cream page with a
+ * faint peach glow, milky glass cards and navy type.
+ * `--surface` is translucent glass; `--surface-solid` is the opaque equivalent for places
+ * that can't be translucent (native dropdown options, chart strokes, tooltips).
+ * Chart series are the validated reference palette, re-checked against the effective card
+ * colour in both modes (dataviz validator: light #fbf6ef, dark #141a2a).
  */
 :root {
   color-scheme: light;
-  --page: #f3eee4;
-  --surface: #fffcf6;
-  --surface-2: #f3ede2;
+  --page: #f4eee6;
+  --glow-1: rgb(255 140 90 / 0.28);
+  --glow-2: rgb(255 196 150 / 0.3);
+  --glow-3: rgb(120 140 200 / 0.12);
+  --surface: rgb(255 252 247 / 0.72);
+  --surface-solid: #fbf6ef;
+  --surface-2: rgb(20 33 61 / 0.05);
+  --glass-border: rgb(255 255 255 / 0.7);
   --ink: #14213d;
   --ink-2: #46506a;
   --muted: #6d7387;
-  --line: #e8e1d3;
-  --axis: #d6cfbf;
+  --line: rgb(20 33 61 / 0.09);
+  --axis: rgb(20 33 61 / 0.16);
   --axis-text: #7d8294;
-  --rail: #14213d;
-  --rail-ink: #f3eee4;
-  --rail-muted: #8e97b0;
-  --rail-active: #26355a;
-  --primary: #14213d;
-  --on-primary: #f8f4ec;
-  --shadow: 0 1px 2px rgb(20 33 61 / 0.04), 0 6px 24px -8px rgb(20 33 61 / 0.1);
+  --rail: rgb(20 33 61 / 0.92);
+  --rail-ink: #f6efe4;
+  --rail-muted: #9aa3bb;
+  --rail-active: rgb(255 255 255 / 0.12);
+  --primary: #e8572a;
+  --on-primary: #ffffff;
+  --primary-glow: 0 8px 24px -8px rgb(232 87 42 / 0.55);
+  --shadow: 0 1px 2px rgb(20 33 61 / 0.04), 0 12px 32px -12px rgb(20 33 61 / 0.14);
   --good: #19723a;
   --critical: #c0392b;
   --series-1: #2a78d6;
@@ -40,22 +49,28 @@
 
 .dark {
   color-scheme: dark;
-  --page: #0b1222;
-  --surface: #131c30;
-  --surface-2: #1c2740;
-  --ink: #f3eee4;
-  --ink-2: #c9c3b6;
+  --page: #070b16;
+  --glow-1: rgb(255 98 52 / 0.38);
+  --glow-2: rgb(214 54 64 / 0.26);
+  --glow-3: rgb(64 92 190 / 0.22);
+  --surface: rgb(255 255 255 / 0.045);
+  --surface-solid: #141a2a;
+  --surface-2: rgb(255 255 255 / 0.07);
+  --glass-border: rgb(255 255 255 / 0.09);
+  --ink: #f6efe4;
+  --ink-2: #c9c2b6;
   --muted: #959bb0;
-  --line: #243050;
-  --axis: #2e3b5e;
+  --line: rgb(255 255 255 / 0.08);
+  --axis: rgb(255 255 255 / 0.14);
   --axis-text: #8a91a8;
-  --rail: #131c30;
-  --rail-ink: #f3eee4;
-  --rail-muted: #7c86a3;
-  --rail-active: #24314f;
-  --primary: #f3eee4;
-  --on-primary: #14213d;
-  --shadow: 0 1px 2px rgb(0 0 0 / 0.2), 0 8px 28px -10px rgb(0 0 0 / 0.5);
+  --rail: rgb(255 255 255 / 0.05);
+  --rail-ink: #f6efe4;
+  --rail-muted: #858ea8;
+  --rail-active: rgb(255 255 255 / 0.1);
+  --primary: #f26236;
+  --on-primary: #ffffff;
+  --primary-glow: 0 8px 28px -6px rgb(242 98 54 / 0.6);
+  --shadow: 0 1px 1px rgb(0 0 0 / 0.2), 0 16px 40px -16px rgb(0 0 0 / 0.6);
   --good: #4cc77a;
   --critical: #f07a6e;
   --series-1: #3987e5;
@@ -72,6 +87,7 @@
   --font-mono: ui-monospace, "SF Mono", "Cascadia Mono", Consolas, monospace;
   --color-page: var(--page);
   --color-surface: var(--surface);
+  --color-surface-solid: var(--surface-solid);
   --color-surface-2: var(--surface-2);
   --color-ink: var(--ink);
   --color-ink-2: var(--ink-2);
@@ -94,13 +110,33 @@ body {
   @apply bg-page text-ink antialiased;
 }
 
+/* The glow: a fixed layer of soft radial lights behind everything (doesn't scroll away). */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(60rem 40rem at 85% -10%, var(--glow-1), transparent 60%),
+    radial-gradient(45rem 35rem at 55% 10%, var(--glow-2), transparent 65%),
+    radial-gradient(50rem 40rem at -10% 110%, var(--glow-3), transparent 60%),
+    var(--page);
+}
+
+option,
+optgroup {
+  background: var(--surface-solid);
+  color: var(--ink);
+}
+
 ::selection {
   background: color-mix(in srgb, var(--series-1) 25%, transparent);
 }
 
 /* Shared component styles (Tailwind v4 custom utilities, usable with @apply and in markup). */
 @utility input {
-  @apply rounded-full border border-line bg-surface px-3.5 py-2 text-sm text-ink outline-none transition placeholder:text-muted focus:border-ink/40 focus:ring-4 focus:ring-ink/10 disabled:opacity-50;
+  @apply rounded-full border border-line bg-surface px-3.5 py-2 text-sm text-ink outline-none backdrop-blur-xl transition placeholder:text-muted focus:border-primary/60 focus:ring-4 focus:ring-primary/15 disabled:opacity-50;
 }
 
 @utility btn {
@@ -108,19 +144,25 @@ body {
 }
 
 @utility btn-primary {
-  @apply btn bg-primary text-on-primary shadow-soft hover:opacity-90;
+  @apply btn bg-primary font-semibold text-on-primary hover:brightness-110;
+  box-shadow: var(--primary-glow);
 }
 
 @utility btn-ghost {
-  @apply btn border border-line bg-surface text-ink hover:bg-surface-2;
+  @apply btn border border-line bg-surface text-ink backdrop-blur-xl hover:bg-surface-2;
 }
 
 @utility btn-icon {
-  @apply btn size-10 border border-line bg-surface p-0 text-ink-2 hover:bg-surface-2 hover:text-ink;
+  @apply btn size-10 border border-line bg-surface p-0 text-ink-2 backdrop-blur-xl hover:bg-surface-2 hover:text-ink;
+}
+
+/* Frosted glass: translucent fill, background blur, a hairline highlight border. */
+@utility glass {
+  @apply border border-(--glass-border) bg-surface shadow-soft backdrop-blur-2xl backdrop-saturate-150;
 }
 
 @utility card {
-  @apply rounded-3xl bg-surface p-6 shadow-soft;
+  @apply glass rounded-3xl p-6;
 }
 
 @utility card-inset {

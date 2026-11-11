@@ -3,13 +3,15 @@
 
 export const THEME_KEY = "sw-theme";
 export const THEMES = ["light", "dark", "system"];
+/** The app is designed dark-first ("night glow"); people can still pick Light or System. */
+export const DEFAULT_THEME = "dark";
 
 export function readThemePref(storage = globalThis.localStorage) {
   try {
     const v = storage?.getItem(THEME_KEY);
-    return THEMES.includes(v) ? v : "system";
+    return THEMES.includes(v) ? v : DEFAULT_THEME;
   } catch {
-    return "system";
+    return DEFAULT_THEME;
   }
 }
 

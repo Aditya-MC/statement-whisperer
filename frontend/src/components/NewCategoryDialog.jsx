@@ -42,14 +42,14 @@ export default function NewCategoryDialog({ groups, defaultGroupId, onCreated, o
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 px-4 pt-[15vh]" onMouseDown={onClose}>
+    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 px-4 pt-[15vh] backdrop-blur-sm" onMouseDown={onClose}>
       <form
         role="dialog"
         aria-modal="true"
         aria-labelledby="new-category-title"
         onSubmit={submit}
         onMouseDown={(e) => e.stopPropagation()}
-        className="card flex w-full max-w-sm flex-col gap-4 shadow-xl"
+        className="flex w-full max-w-sm flex-col gap-4 rounded-3xl border border-line bg-surface-solid p-6 shadow-xl"
       >
         <h2 id="new-category-title" className="text-sm font-semibold">
           New category
