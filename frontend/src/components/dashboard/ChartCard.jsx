@@ -30,11 +30,18 @@ export default function ChartCard({ title, subtitle, legend, renderChart, render
   );
 }
 
-/** Legend entry for bar series: a small rect swatch (mirrors the mark) + text in ink, never colored text. */
-export function LegendItem({ color, children }) {
+/**
+ * Legend entry: a key that mirrors the mark (rect swatch for bars, short line for lines) + text
+ * in ink, never colored text.
+ */
+export function LegendItem({ color, children, shape = "rect" }) {
   return (
     <span className="inline-flex items-center gap-1.5 text-xs text-ink-2">
-      <span aria-hidden="true" className="inline-block size-2.5 rounded-[2px]" style={{ background: color }} />
+      <span
+        aria-hidden="true"
+        className={shape === "line" ? "inline-block h-0.5 w-3.5 rounded-full" : "inline-block size-2.5 rounded-[2px]"}
+        style={{ background: color }}
+      />
       {children}
     </span>
   );
