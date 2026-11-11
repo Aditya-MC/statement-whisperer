@@ -1,9 +1,10 @@
 import { createColumnHelper, tableFeatures, useTable } from "@tanstack/react-table";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "../lib/api.js";
-import { SOURCE_LABELS, groupCategories } from "../lib/categories.js";
+import { SOURCE_LABELS, categoryLabels, groupCategories } from "../lib/categories.js";
 import { amountTone, formatDate, formatMoney } from "../lib/format.js";
 import CategorySelect from "./CategorySelect.jsx";
+import { ApplyScopeDialog } from "./Modal.jsx";
 import NewCategoryDialog from "./NewCategoryDialog.jsx";
 import { IconSearch } from "./icons.jsx";
 import { Badge } from "./ui.jsx";
@@ -29,6 +30,9 @@ function useDebounced(value, ms = 300) {
 export default function TransactionsPage({ accounts, categories, initialAccountId, preset, notify, onCategoriesChanged }) {
   // Row whose "+ New category…" was picked; the new category is applied to it once created.
   const [newCategoryFor, setNewCategoryFor] = useState(null);
+  // { txn, categoryId } waiting for "only this one / apply to all".
+  const [pendingChange, setPendingChange] = useState(null);
+  const labels = useMemo(() => categoryLabels(categories), [categories]);
   const groups = useMemo(() => groupCategories(categories), [categories]);
   const accountsById = useMemo(() => new Map(accounts.map((a) => [a.id, a])), [accounts]);
   const [filters, setFilters] = useState(() => ({
@@ -78,18 +82,19 @@ export default function TransactionsPage({ accounts, categories, initialAccountI
     load();
   }, [load]);
 
-  const changeCategory = useCallback(
-    async (txn, categoryId) => {
-      if (categoryId == null) return;
+  const saveCategory = useCallback(
+    async (txn, categoryId, applyToSimilar) => {
       setSavingId(txn.id);
       try {
-        const res = await api.updateTransaction(txn.id, { category_id: categoryId });
+        const res = await api.updateTransaction(txn.id, { category_id: categoryId, apply_to_similar: applyToSimilar });
         setPage((p) => ({ ...p, items: p.items.map((t) => (t.id === txn.id ? res.transaction : t)) }));
         const merchant = txn.cleaned_merchant ?? "this merchant";
         notify(
-          res.updated_similar > 0
-            ? `Saved as a rule for ${merchant}; updated ${res.updated_similar} similar transaction(s).`
-            : `Saved. Future ${merchant} transactions will use this category.`,
+          !applyToSimilar
+            ? "Saved for this transaction only."
+            : res.updated_similar > 0
+              ? `Saved as a rule for ${merchant}; updated ${res.updated_similar} similar transaction(s).`
+              : `Saved. Future ${merchant} transactions will use this category.`,
           "success",
         );
         if (res.updated_similar > 0) load();
@@ -100,6 +105,18 @@ export default function TransactionsPage({ accounts, categories, initialAccountI
       }
     },
     [load, notify],
+  );
+
+  // Picking a category asks first: this transaction only, or every one from the merchant.
+  // A row with no recognizable merchant can only change on its own.
+  const changeCategory = useCallback(
+    (txn, categoryId) => {
+      if (categoryId == null) return;
+      const merchant = txn.cleaned_merchant;
+      if (!merchant || merchant === "UNKNOWN") saveCategory(txn, categoryId, false);
+      else setPendingChange({ txn, categoryId });
+    },
+    [saveCategory],
   );
 
   const unlinkTransfer = useCallback(
@@ -352,6 +369,19 @@ export default function TransactionsPage({ accounts, categories, initialAccountI
             setNewCategoryFor(null);
             await onCategoriesChanged?.();
             changeCategory(txn, cat.id);
+          }}
+        />
+      )}
+
+      {pendingChange && (
+        <ApplyScopeDialog
+          merchant={pendingChange.txn.cleaned_merchant}
+          categoryName={labels.get(pendingChange.categoryId) ?? "this category"}
+          onClose={() => setPendingChange(null)}
+          onChoose={(all) => {
+            const { txn, categoryId } = pendingChange;
+            setPendingChange(null);
+            saveCategory(txn, categoryId, all);
           }}
         />
       )}

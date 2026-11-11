@@ -56,10 +56,54 @@ def test_create_validation(client: TestClient) -> None:
     assert client.post("/api/categories", json={"name": "   "}).status_code == 422
 
 
-def test_built_in_categories_are_protected(client: TestClient) -> None:
+def test_built_in_categories_cannot_be_renamed(client: TestClient) -> None:
     groceries = categories(client)["Food > Groceries"]
     assert client.patch(f"/api/categories/{groceries}", json={"name": "Shops"}).status_code == 403
-    assert client.delete(f"/api/categories/{groceries}").status_code == 403
+
+
+def test_delete_built_in_group_hides_it_for_that_user_only(
+    client: TestClient, other_client: TestClient, fake_llm: FakeLLMClient
+) -> None:
+    fake_llm.register(HEADER, MAPPING)
+    acct = make_account(client)
+    upload(
+        client, acct, csv_statement([("01/03/2024", "UPI/0012345678/SWIGGY/x@okaxis", "-250.00")])
+    )
+    assert txns(client)[0]["category_id"] == categories(client)["Food > Food Delivery"]
+    pets = client.post(
+        "/api/categories", json={"name": "Treats", "parent_id": group_id(client, "Food")}
+    ).json()
+
+    r = client.delete(f"/api/categories/{group_id(client, 'Food')}")
+    assert r.status_code == 200 and r.json()["transactions_uncategorized"] == 1
+    assert not any(k.startswith("Food") for k in categories(client))
+    assert txns(client)[0]["category_id"] is None
+    # The other user still sees the shared built-ins.
+    assert "Food > Groceries" in categories(other_client)
+    # The custom child was deleted for good; a hidden category can't be used or deleted again.
+    assert client.delete(f"/api/categories/{pets['id']}").status_code == 404
+    hidden = categories(other_client)["Food > Groceries"]
+    t = txns(client)[0]
+    assert (
+        client.patch(f"/api/transactions/{t['id']}", json={"category_id": hidden}).status_code
+        == 422
+    )
+    # Shared seed rules for the hidden category no longer apply to this user.
+    client.post("/api/categorize", json={})
+    assert txns(client)[0]["category_id"] != categories(other_client)["Food > Food Delivery"]
+    # The name is free again for this user.
+    assert client.post("/api/categories", json={"name": "Food"}).status_code == 201
+
+    restored = client.post("/api/categories/restore")
+    assert restored.status_code == 200 and restored.json()["restored"] >= 4
+    assert "Food > Groceries" in categories(client)
+
+
+def test_delete_built_in_leaf(client: TestClient) -> None:
+    groceries = categories(client)["Food > Groceries"]
+    assert client.delete(f"/api/categories/{groceries}").status_code == 200
+    names = categories(client)
+    assert "Food > Groceries" not in names and "Food > Restaurants" in names
 
 
 def test_rename_custom(client: TestClient) -> None:

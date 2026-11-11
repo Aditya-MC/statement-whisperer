@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "../lib/api.js";
+import { NEW_GROUP } from "../lib/categories.js";
 import { Field } from "./ui.jsx";
 
-const NEW_GROUP = "__new_group__";
 const KINDS = [
   { value: "expense", label: "Expense" },
   { value: "income", label: "Income" },
@@ -49,10 +49,10 @@ export default function NewCategoryDialog({ groups, defaultGroupId, onCreated, o
         aria-labelledby="new-category-title"
         onSubmit={submit}
         onMouseDown={(e) => e.stopPropagation()}
-        className="flex w-full max-w-sm flex-col gap-4 rounded-3xl border border-line bg-surface-solid p-6 shadow-xl"
+        className="pop-in flex w-full max-w-sm flex-col gap-4 border-2 border-glass-border bg-surface-solid p-6 shadow-[6px_6px_0_0_var(--axis)]"
       >
-        <h2 id="new-category-title" className="text-sm font-semibold">
-          New category
+        <h2 id="new-category-title" className="font-pixel text-lg leading-tight uppercase">
+          {groupId === NEW_GROUP ? "New group" : "New category"}
         </h2>
         <Field label="Name">
           <input ref={inputRef} className="input" required maxLength={60} value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Pets" />
@@ -84,7 +84,7 @@ export default function NewCategoryDialog({ groups, defaultGroupId, onCreated, o
             Cancel
           </button>
           <button className="btn-primary" disabled={busy || !name.trim()}>
-            {busy ? "Adding…" : "Add category"}
+            {busy ? "Adding…" : groupId === NEW_GROUP ? "Add group" : "Add category"}
           </button>
         </div>
       </form>

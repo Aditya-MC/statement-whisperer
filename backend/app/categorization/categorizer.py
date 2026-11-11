@@ -39,6 +39,7 @@ from app.models import (
     Category,
     CategoryKind,
     CategorySource,
+    HiddenCategory,
     MerchantRule,
     RuleSource,
     Transaction,
@@ -72,12 +73,18 @@ class CategoryIndex:
         return self.by_id[category_id].kind
 
 
+def visible_categories(user_id: int | None) -> ColumnElement[bool]:
+    """Built-in categories plus `user_id`'s own, minus the built-ins that user has deleted
+    (hidden). Only built-ins when user_id is None."""
+    if user_id is None:
+        return Category.user_id.is_(None)
+    hidden = select(HiddenCategory.category_id).where(HiddenCategory.user_id == user_id)
+    return or_(Category.user_id.is_(None), Category.user_id == user_id) & Category.id.not_in(hidden)
+
+
 def load_category_index(db: Session, user_id: int | None = None) -> CategoryIndex:
-    """Built-in categories plus `user_id`'s own (only built-ins when user_id is None)."""
-    visible: ColumnElement[bool] = Category.user_id.is_(None)
-    if user_id is not None:
-        visible = or_(visible, Category.user_id == user_id)
-    cats = list(db.scalars(select(Category).where(visible)))
+    """The categories `user_id` can use (see `visible_categories`)."""
+    cats = list(db.scalars(select(Category).where(visible_categories(user_id))))
     by_id = {c.id: c for c in cats}
     by_path = {
         f"{by_id[c.parent_id].name} > {c.name}": c.id for c in cats if c.parent_id is not None
@@ -239,7 +246,8 @@ def categorize_transactions(
     txns = [t for t in txns if t.category_source != CategorySource.user and not t.is_transfer]
 
     idx = load_category_index(db, user_id)
-    rules = _load_rules(db, user_id)
+    # Rules pointing at a category this user deleted (e.g. a shared seed rule) don't apply.
+    rules = [r for r in _load_rules(db, user_id) if r.category_id in idx.by_id]
     result = CategorizeResult(processed=len(txns))
     assigner = _Assigner(idx, current_rules_version(db), result)
     pending: dict[str, list[Transaction]] = defaultdict(list)
@@ -339,15 +347,17 @@ def _categorize_with_llm(
 def apply_user_correction(
     db: Session, txn: Transaction, category_id: int, *, apply_to_similar: bool = True
 ) -> int:
-    """Set a category by hand, remember it as a user rule, and optionally apply it to other
-    non-user transactions with the same merchant. Returns how many other rows changed."""
+    """Set a category by hand. With `apply_to_similar`, also remember it as a user rule (so
+    future imports follow it) and apply it to other non-user transactions with the same
+    merchant; without it, only this one transaction changes. Returns how many other rows
+    changed."""
     user_id = db.scalar(select(Account.user_id).where(Account.id == txn.account_id))
     merchant = txn.cleaned_merchant or clean_merchant(txn.raw_narration).merchant
     txn.cleaned_merchant = merchant
     txn.category_id = category_id
     txn.category_source = CategorySource.user
 
-    if merchant == "UNKNOWN":
+    if merchant == "UNKNOWN" or not apply_to_similar:
         txn.rules_version = current_rules_version(db)
         db.flush()
         return 0

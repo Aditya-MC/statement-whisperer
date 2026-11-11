@@ -1,19 +1,20 @@
 """Bank accounts and the category tree, scoped to the signed-in user.
 
 Everything here only ever reads or changes the current user's own rows. Built-in categories
-are shared and read-only. Someone else's row is reported as "not found" rather than
-"forbidden", so ids can't be probed.
+are shared: they can't be renamed, and "deleting" one only hides it for you. Someone else's
+row is reported as "not found" rather than "forbidden", so ids can't be probed.
 """
 
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import delete, func, or_, select, update
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.orm import Session
 
 from app.api.deps import current_user, user_account_ids
+from app.categorization.categorizer import visible_categories
 from app.db import get_db
-from app.models import Account, Category, MerchantRule, Transaction, User
+from app.models import Account, Category, HiddenCategory, MerchantRule, Transaction, User
 from app.schemas.api import (
     AccountCreate,
     AccountOut,
@@ -21,6 +22,7 @@ from app.schemas.api import (
     CategoryDeleteOut,
     CategoryOut,
     CategoryRename,
+    CategoryRestoreOut,
 )
 
 router = APIRouter(tags=["accounts"])
@@ -44,14 +46,14 @@ def list_accounts(
 
 
 def _visible(user: User):  # type: ignore[no-untyped-def]
-    return or_(Category.user_id.is_(None), Category.user_id == user.id)
+    return visible_categories(user.id)
 
 
 @router.get("/categories", response_model=list[CategoryOut])
 def list_categories(
     user: User = Depends(current_user), db: Session = Depends(get_db)
 ) -> list[Category]:
-    """Built-in categories plus your own."""
+    """Built-in categories (minus the ones you deleted) plus your own."""
     return list(
         db.scalars(select(Category).where(_visible(user)).order_by(Category.parent_id, Category.id))
     )
@@ -80,7 +82,10 @@ def create_category(
     kind = body.kind
     if body.parent_id is not None:
         parent = db.get(Category, body.parent_id)
-        if parent is None or parent.parent_id is not None or parent.user_id not in (None, user.id):
+        visible = db.scalar(
+            select(Category.id).where(Category.id == body.parent_id, _visible(user))
+        )
+        if parent is None or parent.parent_id is not None or visible is None:
             raise HTTPException(
                 status.HTTP_422_UNPROCESSABLE_CONTENT, "Parent must be a top-level group"
             )
@@ -127,10 +132,17 @@ def rename_category(
 def delete_category(
     category_id: int, user: User = Depends(current_user), db: Session = Depends(get_db)
 ) -> dict[str, int]:
-    """Delete one of your categories (and its children, for a group). Its transactions become
-    uncategorized and its merchant rules are removed."""
-    cat = _own_custom(db, user, category_id)
-    ids = [cat.id, *db.scalars(select(Category.id).where(Category.parent_id == cat.id))]
+    """Delete a category (and its children, for a group). Its transactions become
+    uncategorized and your merchant rules for it are removed. Your own categories are deleted
+    for good; built-in ones are shared, so they're only hidden for you (restorable)."""
+    cat = db.get(Category, category_id)
+    visible = db.scalar(select(Category.id).where(Category.id == category_id, _visible(user)))
+    if cat is None or visible is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Category not found")
+    children = list(
+        db.scalars(select(Category).where(Category.parent_id == cat.id, _visible(user)))
+    )
+    ids = [cat.id, *(c.id for c in children)]
     own_accounts = user_account_ids(db, user)
     in_scope = (Transaction.category_id.in_(ids), Transaction.account_id.in_(own_accounts))
     txns = db.scalar(select(func.count()).select_from(Transaction).where(*in_scope)) or 0
@@ -144,7 +156,24 @@ def delete_category(
         .values(category_id=None, category_source=None, rules_version=None)
     )
     db.execute(delete(MerchantRule).where(*rules_q))
-    db.execute(delete(Category).where(Category.parent_id == cat.id))
-    db.delete(cat)
+    for c in [*children, cat]:
+        if c.user_id == user.id:
+            db.delete(c)  # yours: gone for good
+        else:
+            db.add(HiddenCategory(user_id=user.id, category_id=c.id))  # shared: hide for you
     db.commit()
     return {"transactions_uncategorized": txns, "rules_removed": rules}
+
+
+@router.post("/categories/restore", response_model=CategoryRestoreOut)
+def restore_categories(
+    user: User = Depends(current_user), db: Session = Depends(get_db)
+) -> dict[str, int]:
+    """Bring back every built-in category you deleted. Transactions stay as they are; run
+    "Re-categorize" to let the rules use them again."""
+    n = db.scalar(
+        select(func.count()).select_from(HiddenCategory).where(HiddenCategory.user_id == user.id)
+    )
+    db.execute(delete(HiddenCategory).where(HiddenCategory.user_id == user.id))
+    db.commit()
+    return {"restored": n or 0}

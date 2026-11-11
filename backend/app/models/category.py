@@ -67,3 +67,17 @@ class MerchantRule(Base):
     )
     priority: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
+class HiddenCategory(Base):
+    """A built-in category one user has deleted. Built-ins are shared, so "deleting" one only
+    hides it for that user: it disappears from their lists, menus, rules and the AI's choices."""
+
+    __tablename__ = "hidden_categories"
+
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    category_id: Mapped[int] = mapped_column(
+        ForeignKey("categories.id", ondelete="CASCADE"), primary_key=True
+    )

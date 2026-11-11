@@ -33,3 +33,6 @@ export const SOURCE_LABELS = {
   cache: "Cached",
   llm: "AI",
 };
+
+/** Value used in category menus for "create a new top-level group". */
+export const NEW_GROUP = "__new_group__";

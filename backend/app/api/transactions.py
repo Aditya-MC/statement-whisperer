@@ -12,7 +12,11 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.api.deps import current_user, get_llm, owned_account, user_account_ids
-from app.categorization.categorizer import apply_user_correction, categorize_transactions
+from app.categorization.categorizer import (
+    apply_user_correction,
+    categorize_transactions,
+    visible_categories,
+)
 from app.categorization.transfers import link_transfers
 from app.db import get_db
 from app.models import Category, CategorySource, MerchantRule, Transaction, User
@@ -114,8 +118,10 @@ def update_transaction(
 
     updated = 0
     if body.category_id is not None:
-        cat = db.get(Category, body.category_id)
-        if cat is None or cat.user_id not in (None, user.id):
+        cat = db.scalar(
+            select(Category).where(Category.id == body.category_id, visible_categories(user.id))
+        )
+        if cat is None:
             raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Unknown category")
         updated = apply_user_correction(
             db, txn, body.category_id, apply_to_similar=body.apply_to_similar

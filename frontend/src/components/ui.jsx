@@ -1,4 +1,31 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+
+const prefersReducedMotion = () =>
+  typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+
+/**
+ * Types `text` out one character at a time when it mounts or changes (each page open/load).
+ * Screen readers get the full text at once; the typed copy is hidden from them.
+ */
+function TypedText({ text = "", speed = 70 }) {
+  const [shown, setShown] = useState(() => (prefersReducedMotion() ? text.length : 0));
+  const [prev, setPrev] = useState(text);
+  if (prev !== text) {
+    setPrev(text);
+    setShown(prefersReducedMotion() ? text.length : 0);
+  }
+  useEffect(() => {
+    if (shown >= text.length) return;
+    const t = setTimeout(() => setShown((n) => n + 1), shown === 0 ? 120 : speed);
+    return () => clearTimeout(t);
+  }, [shown, text, speed]);
+  return (
+    <>
+      <span className="sr-only">{text}</span>
+      <span aria-hidden="true">{text.slice(0, shown)}</span>
+    </>
+  );
+}
 
 export function Toast({ message, tone = "info", onClose }) {
   useEffect(() => {
@@ -89,7 +116,7 @@ export function PageHeader({ title, subtitle, children }) {
     <header className="flex flex-wrap items-end justify-between gap-4">
       <div className="min-w-0">
         <h1 className="font-pixel text-4xl leading-none font-normal text-balance uppercase md:text-5xl">
-          {title}
+          <TypedText text={title} />
           <span aria-hidden="true" className="cursor-blink">_</span>
         </h1>
         {subtitle && <p className="mt-2 text-[15px] text-ink-2">{subtitle}</p>}

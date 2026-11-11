@@ -233,6 +233,10 @@ class CategoryDeleteOut(BaseModel):
     rules_removed: int
 
 
+class CategoryRestoreOut(BaseModel):
+    restored: int
+
+
 class ErrorOut(BaseModel):
     detail: str
     existing_import_id: int | None = None

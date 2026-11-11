@@ -13,13 +13,14 @@ import { IconChip } from "../ui.jsx";
 function StatCard({ label, value, icon, tone, hint }) {
   const color = tone === "good" ? "text-good" : tone === "critical" ? "text-critical" : "text-ink";
   return (
-    <section className="card flex min-w-0 flex-col gap-3 p-5">
+    <section className="card stat-card flex min-w-0 flex-col gap-4 p-5">
       <div className="flex items-start justify-between gap-3">
-        <span className="text-sm font-medium text-ink-2">{label}</span>
+        <span className="pt-1 text-[13px] font-bold tracking-wider text-ink-2 uppercase">{label}</span>
         <IconChip>{icon}</IconChip>
       </div>
-      <span className={`truncate font-pixel text-[28px] leading-none tabular-nums ${color}`}>{value}</span>
-      <span className="truncate text-xs text-muted">{hint ?? " "}</span>
+      {/* Pixel digits stretched a little taller, like a segment display (see .stat-value). */}
+      <span className={`stat-value block truncate font-pixel text-[24px] leading-none tabular-nums ${color}`}>{value}</span>
+      <span className="truncate text-[13px] text-muted">{hint ?? " "}</span>
     </section>
   );
 }
