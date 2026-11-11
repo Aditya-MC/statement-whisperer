@@ -6,8 +6,8 @@ export function Toast({ message, tone = "info", onClose }) {
     return () => clearTimeout(t);
   }, [onClose]);
   return (
-    <div role="status" className="fixed inset-x-0 bottom-5 z-50 flex justify-center px-4">
-      <div className="flex max-w-lg items-start gap-3 rounded-md bg-ink px-4 py-2.5 text-sm text-page shadow-lg">
+    <div role="status" className="fixed inset-x-0 bottom-24 z-50 flex justify-center px-4 md:bottom-6">
+      <div className="flex max-w-lg items-start gap-3 rounded-2xl bg-primary px-4 py-3 text-sm text-on-primary shadow-soft">
         {tone !== "info" && <Dot tone={tone === "error" ? "critical" : "good"} />}
         <span>{message}</span>
         <button type="button" onClick={onClose} className="opacity-60 hover:opacity-100" aria-label="Dismiss">
@@ -34,17 +34,17 @@ const STATUS_TONE = { completed: "good", needs_review: "warning", failed: "criti
 
 export function StatusPill({ status }) {
   return (
-    <span className="inline-flex items-center gap-1.5 rounded-full border border-line px-2 py-0.5 text-xs font-medium text-ink-2 [&>span]:mt-0">
+    <span className="inline-flex items-center gap-1.5 rounded-full bg-surface-2 px-2.5 py-0.5 text-xs font-medium text-ink-2 [&>span]:mt-0">
       <Dot tone={STATUS_TONE[status]} />
       {status.replace("_", " ")}
     </span>
   );
 }
 
-/** Neutral hairline chip. Identity comes from the text, not from color. */
+/** Soft neutral chip. Identity comes from the text, not from color. */
 export function Badge({ children, title }) {
   return (
-    <span title={title} className="rounded border border-line px-1.5 py-px text-[11px] font-medium text-muted">
+    <span title={title} className="rounded-full bg-surface-2 px-2 py-px text-[11px] font-medium text-muted">
       {children}
     </span>
   );
@@ -52,19 +52,19 @@ export function Badge({ children, title }) {
 
 export function Field({ label, error, children, hint }) {
   return (
-    <label className="flex flex-col gap-1 text-sm">
-      <span className="font-medium text-ink-2">{label}</span>
+    <label className="flex flex-col gap-1.5 text-sm">
+      <span className="pl-1 text-xs font-medium text-muted">{label}</span>
       {children}
-      {hint && !error && <span className="text-xs text-muted">{hint}</span>}
-      {error && <span className="text-xs text-critical">{error}</span>}
+      {hint && !error && <span className="pl-1 text-xs text-muted">{hint}</span>}
+      {error && <span className="pl-1 text-xs text-critical">{error}</span>}
     </label>
   );
 }
 
-/** Two-option segmented switch (used for Chart | Table). */
+/** iOS-style segmented control (used for Chart | Table). */
 export function Segmented({ options, value, onChange, label }) {
   return (
-    <div role="radiogroup" aria-label={label} className="inline-flex rounded-md border border-line p-0.5">
+    <div role="radiogroup" aria-label={label} className="inline-flex rounded-full bg-surface-2 p-1">
       {options.map((o) => (
         <button
           key={o.value}
@@ -72,13 +72,35 @@ export function Segmented({ options, value, onChange, label }) {
           role="radio"
           aria-checked={value === o.value}
           onClick={() => onChange(o.value)}
-          className={`rounded px-2 py-0.5 text-xs font-medium transition-colors ${
-            value === o.value ? "bg-surface-2 text-ink" : "text-muted hover:text-ink"
+          className={`rounded-full px-3 py-1 text-xs font-medium transition ${
+            value === o.value ? "bg-surface text-ink shadow-soft" : "text-muted hover:text-ink"
           }`}
         >
           {o.label}
         </button>
       ))}
     </div>
+  );
+}
+
+/** Large page title + one-line subtitle, with optional actions on the right. */
+export function PageHeader({ title, subtitle, children }) {
+  return (
+    <header className="flex flex-wrap items-end justify-between gap-4">
+      <div className="min-w-0">
+        <h1 className="text-3xl font-semibold tracking-tight text-balance">{title}</h1>
+        {subtitle && <p className="mt-1 text-[15px] text-ink-2">{subtitle}</p>}
+      </div>
+      {children && <div className="flex flex-wrap items-center gap-2">{children}</div>}
+    </header>
+  );
+}
+
+/** Round icon chip used in the top-right corner of stat cards. */
+export function IconChip({ children }) {
+  return (
+    <span className="grid size-9 shrink-0 place-items-center rounded-full bg-surface-2 text-ink-2" aria-hidden="true">
+      {children}
+    </span>
   );
 }

@@ -4,55 +4,72 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 /*
- * Design tokens. Minimal and sharp: near-neutral surfaces, hairline borders, one ink.
- * Chart colors are the validated reference palette (blue/orange pass the colorblind and
- * contrast checks in both modes). Dark values are their own steps, not an inversion.
+ * Design tokens: navy + cream, soft and quiet (iOS / Notion feel).
+ * Light: cream page, warm-white cards, navy ink and navy navigation rail.
+ * Dark: deep navy page, navy cards, cream ink. Dark values are their own steps, not an inversion.
+ * Chart series are the validated reference palette, re-checked against both card surfaces
+ * (dataviz validator: light #fffcf6, dark #131c30).
  */
 :root {
   color-scheme: light;
-  --page: #f6f6f4;
-  --surface: #fcfcfb;
-  --surface-2: #f0efec;
-  --ink: #0b0b0b;
-  --ink-2: #52514e;
-  --muted: #6b6a65;
-  --line: #e1e0d9;
-  --axis: #c3c2b7;
-  --axis-text: #898781;
-  --good: #006300;
-  --critical: #c42f2f;
+  --page: #f3eee4;
+  --surface: #fffcf6;
+  --surface-2: #f3ede2;
+  --ink: #14213d;
+  --ink-2: #46506a;
+  --muted: #6d7387;
+  --line: #e8e1d3;
+  --axis: #d6cfbf;
+  --axis-text: #7d8294;
+  --rail: #14213d;
+  --rail-ink: #f3eee4;
+  --rail-muted: #8e97b0;
+  --rail-active: #26355a;
+  --primary: #14213d;
+  --on-primary: #f8f4ec;
+  --shadow: 0 1px 2px rgb(20 33 61 / 0.04), 0 6px 24px -8px rgb(20 33 61 / 0.1);
+  --good: #19723a;
+  --critical: #c0392b;
   --series-1: #2a78d6;
   --series-2: #eb6834;
   --series-3: #1baf7a;
   --series-4: #eda100;
   --series-5: #e87ba4;
-  --series-muted: #c3c2b7;
+  --series-muted: #d6cfbf;
 }
 
 .dark {
   color-scheme: dark;
-  --page: #0d0d0d;
-  --surface: #1a1a19;
-  --surface-2: #262624;
-  --ink: #f0efec;
-  --ink-2: #c3c2b7;
-  --muted: #a3a29a;
-  --line: #2c2c2a;
-  --axis: #383835;
-  --axis-text: #898781;
-  --good: #0ca30c;
-  --critical: #e66767;
+  --page: #0b1222;
+  --surface: #131c30;
+  --surface-2: #1c2740;
+  --ink: #f3eee4;
+  --ink-2: #c9c3b6;
+  --muted: #959bb0;
+  --line: #243050;
+  --axis: #2e3b5e;
+  --axis-text: #8a91a8;
+  --rail: #131c30;
+  --rail-ink: #f3eee4;
+  --rail-muted: #7c86a3;
+  --rail-active: #24314f;
+  --primary: #f3eee4;
+  --on-primary: #14213d;
+  --shadow: 0 1px 2px rgb(0 0 0 / 0.2), 0 8px 28px -10px rgb(0 0 0 / 0.5);
+  --good: #4cc77a;
+  --critical: #f07a6e;
   --series-1: #3987e5;
   --series-2: #d95926;
   --series-3: #199e70;
   --series-4: #c98500;
   --series-5: #d55181;
-  --series-muted: #4a4a46;
+  --series-muted: #3a4769;
 }
 
 @theme inline {
-  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  --font-mono: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  /* System UI faces: SF Pro on Apple devices, Segoe UI Variable on Windows. No web fonts. */
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable Text", "Segoe UI", system-ui, Roboto, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "Cascadia Mono", Consolas, monospace;
   --color-page: var(--page);
   --color-surface: var(--surface);
   --color-surface-2: var(--surface-2);
@@ -60,37 +77,79 @@
   --color-ink-2: var(--ink-2);
   --color-muted: var(--muted);
   --color-line: var(--line);
+  --color-rail: var(--rail);
+  --color-rail-ink: var(--rail-ink);
+  --color-rail-muted: var(--rail-muted);
+  --color-rail-active: var(--rail-active);
+  --color-primary: var(--primary);
+  --color-on-primary: var(--on-primary);
   --color-good: var(--good);
   --color-critical: var(--critical);
   --color-series-1: var(--series-1);
   --color-series-2: var(--series-2);
+  --shadow-soft: var(--shadow);
 }
 
 body {
   @apply bg-page text-ink antialiased;
 }
 
+::selection {
+  background: color-mix(in srgb, var(--series-1) 25%, transparent);
+}
+
 /* Shared component styles (Tailwind v4 custom utilities, usable with @apply and in markup). */
 @utility input {
-  @apply rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-ink outline-none transition-colors placeholder:text-muted focus:border-ink focus:ring-1 focus:ring-ink disabled:opacity-50;
+  @apply rounded-full border border-line bg-surface px-3.5 py-2 text-sm text-ink outline-none transition placeholder:text-muted focus:border-ink/40 focus:ring-4 focus:ring-ink/10 disabled:opacity-50;
 }
 
 @utility btn {
-  @apply inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-series-1 disabled:cursor-not-allowed disabled:opacity-50;
+  @apply inline-flex items-center justify-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium transition duration-150 outline-none select-none focus-visible:ring-4 focus-visible:ring-series-1/30 active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100;
 }
 
 @utility btn-primary {
-  @apply btn bg-ink text-page hover:opacity-85;
+  @apply btn bg-primary text-on-primary shadow-soft hover:opacity-90;
 }
 
 @utility btn-ghost {
-  @apply btn border border-line text-ink hover:bg-surface-2;
+  @apply btn border border-line bg-surface text-ink hover:bg-surface-2;
+}
+
+@utility btn-icon {
+  @apply btn size-10 border border-line bg-surface p-0 text-ink-2 hover:bg-surface-2 hover:text-ink;
 }
 
 @utility card {
-  @apply rounded-lg border border-line bg-surface p-5;
+  @apply rounded-3xl bg-surface p-6 shadow-soft;
+}
+
+@utility card-inset {
+  @apply rounded-2xl border border-line bg-surface;
 }
 
 @utility eyebrow {
-  @apply text-xs font-medium tracking-wide text-muted uppercase;
+  @apply text-xs font-medium text-muted;
+}
+
+/* Native selects: drop the OS arrow and draw a soft chevron so they read as pills. */
+select.input {
+  @apply appearance-none pr-9;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%236d7387' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m4 6 4 4 4-4'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.85rem center;
+  background-size: 0.9rem;
+}
+
+input[type="checkbox"],
+input[type="radio"] {
+  accent-color: var(--primary);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
 }
